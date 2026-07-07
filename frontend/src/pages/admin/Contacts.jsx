@@ -1,5 +1,6 @@
-import { useState, useEffect } from "react";
+import { useCallback, useState, useEffect } from "react";
 import { Link } from "react-router-dom";
+import { API_BASE_URL } from "../../api/client";
 
 export default function Contacts() {
   const [contacts, setContacts] = useState([]);
@@ -15,12 +16,12 @@ export default function Contacts() {
   const [isEditing, setIsEditing] = useState(false);
 
   // Get authentication token
-  const getAuthToken = () => {
+  const getAuthToken = useCallback(() => {
     return localStorage.getItem('token') || sessionStorage.getItem('token');
-  };
+  }, []);
 
   // Fetch contacts data with proper error handling
-  const fetchContacts = async () => {
+  const fetchContacts = useCallback(async () => {
     try {
       setLoading(true);
       setError("");
@@ -36,7 +37,7 @@ export default function Contacts() {
         headers['Authorization'] = `Bearer ${token}`;
       }
 
-      const response = await fetch("http://127.0.0.1:8000/api/contacts", {
+      const response = await fetch(`${API_BASE_URL}/contacts`, {
         method: 'GET',
         headers: headers,
       });
@@ -85,11 +86,11 @@ export default function Contacts() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [getAuthToken]);
 
   useEffect(() => {
     fetchContacts();
-  }, []);
+  }, [fetchContacts]);
 
   // Handle form input changes
   const handleInputChange = (e) => {
@@ -111,8 +112,8 @@ export default function Contacts() {
       const currentContactId = contacts.length > 0 ? contacts[0].id : null;
       
       const url = isEditing && currentContactId
-        ? `http://127.0.0.1:8000/api/contacts/${currentContactId}`
-        : "http://127.0.0.1:8000/api/contacts";
+        ? `${API_BASE_URL}/contacts/${currentContactId}`
+        : `${API_BASE_URL}/contacts`;
       
       const method = isEditing && currentContactId ? "PUT" : "POST";
 
@@ -145,7 +146,7 @@ export default function Contacts() {
         throw new Error(`Server error: ${response.status} - ${errorText}`);
       }
 
-      const result = await response.json();
+      await response.json();
       
       // Refresh contacts data
       await fetchContacts();

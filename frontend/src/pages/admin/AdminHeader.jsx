@@ -1,16 +1,44 @@
-// src/components/AdminHeader.jsx
-import React, { useContext, useState, useRef, useEffect } from "react";
+import React, { useContext, useEffect, useMemo, useRef, useState } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import {
+  RiArrowDownSLine,
+  RiDashboardLine,
+  RiExternalLinkLine,
+  RiLogoutBoxRLine,
+  RiUser3Line,
+} from "react-icons/ri";
 import { AuthContext } from "../../contexts/AuthContext";
-import { useNavigate } from "react-router-dom";
-import { logoutUser } from "../../api/client";
+import { clearAuthData, getStoredToken, logoutUser } from "../../api/client";
+
+const titles = [
+  { path: "/admin/service-orders", title: "Service Orders" },
+  { path: "/admin/service-centers", title: "Service Centers" },
+  { path: "/admin/wallet-transactions", title: "Wallet Transactions" },
+  { path: "/admin/parkings", title: "Parking Lots" },
+  { path: "/admin/slots", title: "Parking Slots" },
+  { path: "/admin/bookings", title: "Bookings" },
+  { path: "/admin/users", title: "Users" },
+  { path: "/admin/checkouts", title: "Checkouts" },
+  { path: "/admin/wallet", title: "Wallet Overview" },
+  { path: "/admin/reports", title: "Reports" },
+  { path: "/admin/messages", title: "Messages" },
+  { path: "/admin/contacts", title: "Contacts" },
+  { path: "/admin/services", title: "Services" },
+  { path: "/admin/profile", title: "Admin Profile" },
+];
 
 export default function AdminHeader() {
   const { user, setUser } = useContext(AuthContext);
   const navigate = useNavigate();
-  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const location = useLocation();
   const dropdownRef = useRef(null);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
 
-  // Close dropdown when clicking outside
+  const pageTitle = useMemo(() => {
+    const match = titles.find((item) => location.pathname.startsWith(item.path));
+    return match?.title || "Dashboard";
+  }, [location.pathname]);
+
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
@@ -18,128 +46,65 @@ export default function AdminHeader() {
       }
     };
 
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
   const handleLogout = async () => {
     try {
-      const token = localStorage.getItem("token");
-      if (token) await logoutUser();
-
-      localStorage.removeItem("token");
-      localStorage.removeItem("user");
-      localStorage.removeItem("sidebarOpen");
-      setUser(null);
-      navigate("/login");
+      if (getStoredToken()) {
+        await logoutUser();
+      }
     } catch (error) {
       console.error("Logout failed:", error);
-      localStorage.removeItem("token");
-      localStorage.removeItem("user");
+    } finally {
+      clearAuthData();
       localStorage.removeItem("sidebarOpen");
       setUser(null);
       navigate("/login");
     }
   };
 
-  const handleVisitSite = () => {
-    window.open("/", "_blank");
-  };
-
-  const handleProfileClick = () => {
-    navigate("/admin/profile"); // Absolute path ব্যবহার করুন
-    setDropdownOpen(false);
-  };
-
-  const toggleDropdown = () => {
-    setDropdownOpen(!dropdownOpen);
-  };
-
   return (
-    <header className="bg-white shadow-sm border-bottom" style={{ height: '70px', flexShrink: 0 }}>
-      <div className="d-flex justify-content-between align-items-center h-100 px-4">
-        {/* Left Side - Brand/Title */}
-        <div className="d-flex align-items-center">
-          <h4 className="mb-0 text-primary fw-bold"></h4>
-        </div>
+    <header className="admin-header">
+      <div className="admin-header-title">
         
-        {/* Right Side - Actions */}
-        <div className="d-flex align-items-center gap-3">
-          {/* Visit Site Button */}
-          <button 
-            className="btn btn-outline-primary btn-sm d-flex align-items-center gap-2"
-            onClick={handleVisitSite}
-            style={{ 
-              borderRadius: '8px',
-              padding: '6px 12px',
-              fontSize: '0.875rem'
-            }}
-          >
-            <i className="fa-solid fa-house"></i>
-            <span>Visit Site</span>
+        <h1>{pageTitle}</h1>
+      </div>
+
+      <div className="admin-header-actions">
+        <Link to="/" target="_blank" className="admin-header-link">
+          <RiExternalLinkLine />
+          Visit Site
+        </Link>
+
+        <div className="admin-profile-menu" ref={dropdownRef}>
+          <button type="button" className="admin-profile-trigger" onClick={() => setDropdownOpen((open) => !open)}>
+            <span>{(user?.name || "A").charAt(0).toUpperCase()}</span>
+            <div>
+              <strong>{user?.name || "Admin"}</strong>
+            </div>
+            <RiArrowDownSLine className={dropdownOpen ? "is-open" : ""} />
           </button>
 
-          {/* User Profile Dropdown - Custom */}
-          <div className="position-relative" ref={dropdownRef}>
-            <button 
-              className="btn btn-light d-flex align-items-center gap-2 border-0"
-              onClick={toggleDropdown}
-              style={{ 
-                borderRadius: '8px',
-                background: 'rgba(0, 0, 0, 0.05)',
-                padding: '8px 12px'
-              }}
-            >
-              <div className="bg-primary rounded-circle d-flex align-items-center justify-content-center" 
-                   style={{width: '32px', height: '32px'}}>
-                <span className="text-white fw-bold">
-                  {user?.name ? user.name.charAt(0).toUpperCase() : 'A'}
-                </span>
-              </div>
-              <span>{user?.name || 'Admin'}</span>
-              <i className={`fas fa-chevron-${dropdownOpen ? 'up' : 'down'}`} style={{ fontSize: '0.8rem' }}></i>
-            </button>
-
-            {/* Dropdown Menu */}
-            {dropdownOpen && (
-              <div 
-                className="bg-white shadow-lg border rounded-3 p-2"
-                style={{ 
-                  position: 'absolute',
-                  right: 0,
-                  top: '100%',
-                  zIndex: 1000,
-                  minWidth: '200px',
-                  marginTop: '8px'
+          {dropdownOpen && (
+            <div className="admin-profile-dropdown">
+              <button
+                type="button"
+                onClick={() => {
+                  navigate("/admin/profile");
+                  setDropdownOpen(false);
                 }}
               >
-                <button 
-                  className="btn btn-light w-100 text-start d-flex align-items-center gap-2 py-2 px-3 mb-1 rounded-2 border-0"
-                  onClick={handleProfileClick}
-                >
-                  <i className="fas fa-user text-muted" style={{ width: '20px' }}></i>
-                  <span>Profile</span>
-                </button>
-                
-                {/*<button className="btn btn-light w-100 text-start d-flex align-items-center gap-2 py-2 px-3 mb-1 rounded-2 border-0">
-                                  <i className="fas fa-cog text-muted" style={{ width: '20px' }}></i>
-                                  <span>Settings</span>
-                                </button>*/}
-                
-                <hr className="my-2" />
-                
-                <button 
-                  className="btn btn-light w-100 text-start d-flex align-items-center gap-2 py-2 px-3 rounded-2 border-0 text-danger"
-                  onClick={handleLogout}
-                >
-                  <i className="fas fa-sign-out-alt" style={{ width: '20px' }}></i>
-                  <span>Logout</span>
-                </button>
-              </div>
-            )}
-          </div>
+                <RiUser3Line />
+                Profile
+              </button>
+              <button type="button" className="is-danger" onClick={handleLogout}>
+                <RiLogoutBoxRLine />
+                Logout
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </header>

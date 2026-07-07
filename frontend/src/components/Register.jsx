@@ -1,11 +1,15 @@
 import React, { useState } from "react";
 import { registerUser } from "../api/client";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { FaEnvelope, FaEye, FaEyeSlash, FaLock, FaUser, FaUserPlus } from "react-icons/fa";
 
 export default function Register() {
     const [form, setForm] = useState({ name:"", email:"", password:"", password_confirmation:"" });
     const [message, setMessage] = useState("");
+    const [isError, setIsError] = useState(false);
     const [loading, setLoading] = useState(false);
+    const [showPassword, setShowPassword] = useState(false);
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const navigate = useNavigate();
 
     const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
@@ -14,132 +18,135 @@ export default function Register() {
         e.preventDefault();
         setLoading(true);
         setMessage("");
+        setIsError(false);
 
-        const formData = new FormData();
-        Object.keys(form).forEach(key => formData.append(key, form[key]));
+        try {
+            const data = await registerUser(form);
 
-        const data = await registerUser(formData);
-
-        if (data.status === "success") {
-            setMessage("Registration successful! Redirecting to login...");
-            setTimeout(() => {
-                navigate("/login");
-            }, 2500);
-        } else {
-            setMessage(data.message || "Something went wrong!");
+            if (data.status === "success") {
+                setMessage("Registration successful! Redirecting to login...");
+                setIsError(false);
+                setTimeout(() => {
+                    navigate("/login");
+                }, 1200);
+            } else {
+                setMessage(data.message || "Something went wrong!");
+                setIsError(true);
+            }
+        } catch (error) {
+            const errors = error.response?.data?.errors;
+            const firstError = errors ? Object.values(errors).flat()[0] : null;
+            setMessage(firstError || error.response?.data?.message || error.message || "Registration failed. Please try again.");
+            setIsError(true);
+        } finally {
+            setLoading(false);
         }
-
-        setLoading(false);
     };
 
     return (
-        <div className="min-vh-100 d-flex align-items-center justify-content-center bg-light">
-            <div className="container-fluid">
-                <div className="row justify-content-center">
-                    <div className="col-xl-5 col-lg-4 col-md-5 col-sm-8">
-                        <div className="card border-0 shadow-lg rounded-4">
-                            <div className="card-body p-5">
-                                {/* Logo/Brand Section */}
-                                <div className="text-center mb-5">
-                                    <h2 className="fw-bold text-dark">Create Account</h2>
-                                    {/*<p className="text-muted">Register a new account</p>*/}
-                                </div>
+                <section className="auth-card">
+                    <div className="auth-card-heading">
+                        <h2>Create your account</h2>
+                    </div>
 
-                                {/* Message Alert */}
                                 {message && (
-                                    <div className={`alert ${message.includes('successful') ? 'alert-success' : 'alert-info'} rounded-2 mb-4`}>
+                        <div className={`auth-alert ${isError ? "is-error" : "is-success"}`}>
                                         {message}
                                     </div>
                                 )}
 
-                                {/* Register Form */}
-                                <form onSubmit={handleSubmit}>
-                                    <div className="mb-3">
+                    <form onSubmit={handleSubmit} className="auth-form">
+                        <label className="auth-field">
+                            <FaUser />
                                         <input
                                             name="name"
                                             type="text"
-                                            className="form-control form-control-lg rounded-2 border-0 bg-light"
                                             onChange={handleChange}
                                             placeholder="Full Name"
                                             required
-                                            style={{padding: '12px 16px'}}
                                         />
-                                    </div>
-                                    <div className="mb-3">
+                        </label>
+
+                        <label className="auth-field">
+                            <FaEnvelope />
                                         <input
                                             name="email"
                                             type="email"
-                                            className="form-control form-control-lg rounded-2 border-0 bg-light"
                                             onChange={handleChange}
                                             placeholder="Email"
                                             required
-                                            style={{padding: '12px 16px'}}
                                         />
-                                    </div>
-                                    <div className="mb-3">
+                        </label>
+
+                        <label className="auth-field">
+                            <FaLock />
                                         <input
                                             name="password"
-                                            type="password"
-                                            className="form-control form-control-lg rounded-2 border-0 bg-light"
+                                            type={showPassword ? "text" : "password"}
                                             onChange={handleChange}
                                             placeholder="Password"
                                             required
-                                            style={{padding: '12px 16px'}}
+                                            value={form.password}
                                         />
-                                    </div>
-                                    <div className="mb-4">
+                            <button
+                                type="button"
+                                className="auth-password-toggle"
+                                onClick={() => setShowPassword((value) => !value)}
+                                aria-label={showPassword ? "Hide password" : "Show password"}
+                            >
+                                {showPassword ? <FaEyeSlash /> : <FaEye />}
+                            </button>
+                        </label>
+
+                        <label className="auth-field">
+                            <FaLock />
                                         <input
                                             name="password_confirmation"
-                                            type="password"
-                                            className="form-control form-control-lg rounded-2 border-0 bg-light"
+                                            type={showConfirmPassword ? "text" : "password"}
                                             onChange={handleChange}
                                             placeholder="Confirm Password"
                                             required
-                                            style={{padding: '12px 16px'}}
+                                            value={form.password_confirmation}
                                         />
-                                    </div>
+                            <button
+                                type="button"
+                                className="auth-password-toggle"
+                                onClick={() => setShowConfirmPassword((value) => !value)}
+                                aria-label={showConfirmPassword ? "Hide confirm password" : "Show confirm password"}
+                            >
+                                {showConfirmPassword ? <FaEyeSlash /> : <FaEye />}
+                            </button>
+                        </label>
+
                                     <button 
                                         type="submit" 
-                                        className="btn btn-primary btn-lg w-100 rounded-2 fw-semibold py-2"
+                            className="auth-submit-btn"
                                         disabled={loading}
-                                        style={{
-                                            background: 'linear-gradient(45deg, #3b82f6, #1d4ed8)',
-                                            border: 'none',
-                                            fontSize: '1.1rem'
-                                        }}
                                     >
                                         {loading ? (
                                             <>
-                                                <span className="spinner-border spinner-border-sm me-2" role="status"></span>
+                                    <span className="auth-spinner" />
                                                 Registering...
                                             </>
                                         ) : (
-                                            'Register'
+                                <>
+                                    <FaUserPlus />
+                                    Register
+                                </>
                                         )}
                                     </button>
                                 </form>
 
-                                {/* Additional Links */}
-                                <div className="text-center mt-4">
-                                    <p className="text-muted mb-2">
+                    <div className="auth-links">
+                        <p>
                                         Already have an account? 
-                                        <a href="/login" className="text-primary fw-semibold text-decoration-none ms-1">
-                                            Sign In
-                                        </a>
+                            <Link to="/login">
+                                             Sign In
+                                        </Link>
                                     </p>
                                 </div>
-                            </div>
-                        </div>
 
-                        {/* Footer */}
-                        <div className="text-center mt-4">
-                            <p className="text-muted small">
-                                &copy; {new Date().getFullYear()} MONARK. All rights reserved.
-                            </p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
+                    
+                </section>
     );
 }

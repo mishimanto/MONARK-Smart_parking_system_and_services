@@ -1,12 +1,14 @@
 <?php
 
-namespace App\Http\Controllers;
+namespace App\Http\Controllers\API;
 
+use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use App\Models\ServiceOrder;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 
 class ServiceOrderController extends Controller
 {
@@ -25,6 +27,10 @@ class ServiceOrderController extends Controller
 
             $userId = Auth::id();
             Log::info('Fetching orders for user: ' . $userId);
+
+            if (!Schema::hasTable('service_orders')) {
+                return response()->json([]);
+            }
 
             $orders = ServiceOrder::with('service')
                 ->where('user_id', $userId)

@@ -9,6 +9,10 @@ class CreatePaymentMethodsTable extends Migration
 {
     public function up()
     {
+        if (Schema::hasTable('payment_methods')) {
+            return;
+        }
+
         Schema::create('payment_methods', function (Blueprint $table) {
             $table->id();
             $table->string('name'); // bKash, Nagad, Rocket

@@ -34,7 +34,6 @@ export default function Topup() {
         try {
             const response = await api.post('/initiate-topup', formData);
             if (response.data.success) {
-                const transactionId = response.data.data.transaction_id;
                 // Verification page এ redirect করবে
                 navigate('/verify-transaction', { 
                     state: { 
@@ -81,7 +80,7 @@ export default function Topup() {
                                         required
                                     />
                                     <div className="amount-info">
-                                        Enter amount between BDT <span>৳1,000</span> to <span>৳50,000</span>
+                                        Enter amount between <span>BDT 1,000</span> to <span>BDT 50,000</span>
                                     </div>
                                 </div>
 

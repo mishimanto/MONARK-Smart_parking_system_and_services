@@ -1,7 +1,37 @@
-import React, { useState, useEffect } from "react";
+import React, { useCallback, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import api from "../api/client";
-import Spinner from "../components/Spinner";
+import {
+    FaArrowLeft,
+    FaCar,
+    FaCheckCircle,
+    FaClock,
+    FaLocationArrow,
+    FaMapMarkerAlt,
+    FaParking,
+    FaRedo,
+    FaStar,
+} from "react-icons/fa";
+import api, { APP_BASE_URL } from "../api/client";
+import "./css/AllParkings.css";
+
+const BASE_URL = `${APP_BASE_URL}/`;
+const PARKING_FALLBACKS = ["/images/parking-lot1.jpg", "/images/parking-lot2.jpg", "/images/parking-lot3.jpg"];
+
+const getFallbackImage = (index = 0) => PARKING_FALLBACKS[index % PARKING_FALLBACKS.length];
+
+const resolveImageUrl = (image, index = 0) => {
+    if (!image || image === "null" || image === "undefined") return getFallbackImage(index);
+    const imageValue = String(image).trim();
+    if (/^https?:\/\//i.test(imageValue)) return imageValue;
+    if (imageValue.startsWith("/images/")) return imageValue;
+    return `${BASE_URL}${imageValue.replace(/^\/+/, "")}`;
+};
+
+const handleParkingImageError = (event, index = 0) => {
+    const fallback = getFallbackImage(index);
+    if (event.currentTarget.src.endsWith(fallback)) return;
+    event.currentTarget.src = fallback;
+};
 
 export default function AllParkings() {
     const [parkingSpots, setParkingSpots] = useState([]);
@@ -14,10 +44,8 @@ export default function AllParkings() {
     const [areaNames, setAreaNames] = useState({});
     const navigate = useNavigate();
 
-    const BASE_URL = "http://127.0.0.1:8000/";
-
     // Get user's current location with better error handling
-    const getUserLocation = () => {
+    const getUserLocation = useCallback(() => {
         return new Promise((resolve, reject) => {
             if (!navigator.geolocation) {
                 reject(new Error("Geolocation is not supported"));
@@ -56,10 +84,10 @@ export default function AllParkings() {
                 }
             );
         });
-    };
+    }, []);
 
     // Get area name from coordinates (Reverse Geocoding) with rate limiting
-    const getAreaFromCoordinates = async (lat, lng, delay = 0) => {
+    const getAreaFromCoordinates = useCallback(async (lat, lng, delay = 0) => {
         try {
             // Add delay to avoid rate limiting
             if (delay > 0) {
@@ -99,10 +127,10 @@ export default function AllParkings() {
             console.error('Error getting area name:', error);
             return 'Dhaka Area';
         }
-    };
+    }, []);
 
     // Get area names for all parkings sequentially to avoid rate limiting
-    const getAllParkingAreaNames = async (parkings) => {
+    const getAllParkingAreaNames = useCallback(async (parkings) => {
         const areaNamesMap = {};
         
         for (let i = 0; i < parkings.length; i++) {
@@ -129,7 +157,70 @@ export default function AllParkings() {
         }
         
         return areaNamesMap;
-    };
+    }, [getAreaFromCoordinates]);
+
+    // Estimate distance from text description (fallback)
+    const estimateDistanceFromText = useCallback((distanceText) => {
+        if (!distanceText) return 10; // Default far distance
+        
+        const match = distanceText.match(/(\d+(?:\.\d+)?)\s*(km|m)/i);
+        if (match) {
+            const value = parseFloat(match[1]);
+            const unit = match[2].toLowerCase();
+            
+            if (unit === 'km') return value;
+            if (unit === 'm') return value / 1000;
+        }
+        
+        // Extract number from text like "2 km from city center"
+        const numberMatch = distanceText.match(/(\d+(?:\.\d+)?)/);
+        if (numberMatch) {
+            return parseFloat(numberMatch[1]);
+        }
+        
+        return 10; // Default far distance
+    }, []);
+
+    // Haversine formula to calculate distance between two coordinates
+    const calculateDistance = useCallback((lat1, lon1, lat2, lon2) => {
+        const R = 6371; // Earth's radius in kilometers
+        const dLat = (lat2 - lat1) * Math.PI / 180;
+        const dLon = (lon2 - lon1) * Math.PI / 180;
+        const a = 
+            Math.sin(dLat/2) * Math.sin(dLat/2) +
+            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+            Math.sin(dLon/2) * Math.sin(dLon/2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        const distance = R * c;
+        return distance;
+    }, []);
+
+    // Sort parkings by distance from user
+    const sortParkingsByDistance = useCallback((parkings, userLoc) => {
+        return parkings
+            .map(parking => {
+                let distanceKm;
+                
+                if (parking.latitude && parking.longitude) {
+                    // Calculate actual distance using coordinates
+                    distanceKm = calculateDistance(
+                        userLoc.latitude,
+                        userLoc.longitude,
+                        parking.latitude,
+                        parking.longitude
+                    );
+                } else {
+                    // Fallback: estimate from distance field (e.g., "2 km from city center")
+                    distanceKm = estimateDistanceFromText(parking.distance);
+                }
+                
+                return {
+                    ...parking,
+                    calculatedDistance: distanceKm
+                };
+            })
+            .sort((a, b) => a.calculatedDistance - b.calculatedDistance);
+    }, [calculateDistance, estimateDistanceFromText]);
 
     // Fetch user location and parkings
     useEffect(() => {
@@ -138,9 +229,12 @@ export default function AllParkings() {
             setLocationLoading(true);
 
             try {
+                let detectedLocation = null;
+
                 // Try to get user location
                 try {
                     const location = await getUserLocation();
+                    detectedLocation = location;
                     setUserLocation(location);
                     setLocationError(null);
                     
@@ -175,8 +269,8 @@ export default function AllParkings() {
                     });
                 
                 // If we have user location, sort parkings by distance
-                if (userLocation) {
-                    const sortedParkings = sortParkingsByDistance(processedParkings, userLocation);
+                if (detectedLocation) {
+                    const sortedParkings = sortParkingsByDistance(processedParkings, detectedLocation);
                     setFilteredParkings(sortedParkings);
                 } else {
                     setFilteredParkings(processedParkings);
@@ -191,7 +285,7 @@ export default function AllParkings() {
         };
 
         fetchData();
-    }, []);
+    }, [getAllParkingAreaNames, getAreaFromCoordinates, getUserLocation, sortParkingsByDistance]);
 
     // Update filtered parkings when userLocation changes
     useEffect(() => {
@@ -199,70 +293,7 @@ export default function AllParkings() {
             const sortedParkings = sortParkingsByDistance(parkingSpots, userLocation);
             setFilteredParkings(sortedParkings);
         }
-    }, [userLocation, parkingSpots]);
-
-    // Haversine formula to calculate distance between two coordinates
-    const calculateDistance = (lat1, lon1, lat2, lon2) => {
-        const R = 6371; // Earth's radius in kilometers
-        const dLat = (lat2 - lat1) * Math.PI / 180;
-        const dLon = (lon2 - lon1) * Math.PI / 180;
-        const a = 
-            Math.sin(dLat/2) * Math.sin(dLat/2) +
-            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
-            Math.sin(dLon/2) * Math.sin(dLon/2);
-        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-        const distance = R * c;
-        return distance;
-    };
-
-    // Sort parkings by distance from user
-    const sortParkingsByDistance = (parkings, userLoc) => {
-        return parkings
-            .map(parking => {
-                let distanceKm;
-                
-                if (parking.latitude && parking.longitude) {
-                    // Calculate actual distance using coordinates
-                    distanceKm = calculateDistance(
-                        userLoc.latitude,
-                        userLoc.longitude,
-                        parking.latitude,
-                        parking.longitude
-                    );
-                } else {
-                    // Fallback: estimate from distance field (e.g., "2 km from city center")
-                    distanceKm = estimateDistanceFromText(parking.distance);
-                }
-                
-                return {
-                    ...parking,
-                    calculatedDistance: distanceKm
-                };
-            })
-            .sort((a, b) => a.calculatedDistance - b.calculatedDistance);
-    };
-
-    // Estimate distance from text description (fallback)
-    const estimateDistanceFromText = (distanceText) => {
-        if (!distanceText) return 10; // Default far distance
-        
-        const match = distanceText.match(/(\d+(?:\.\d+)?)\s*(km|m)/i);
-        if (match) {
-            const value = parseFloat(match[1]);
-            const unit = match[2].toLowerCase();
-            
-            if (unit === 'km') return value;
-            if (unit === 'm') return value / 1000;
-        }
-        
-        // Extract number from text like "2 km from city center"
-        const numberMatch = distanceText.match(/(\d+(?:\.\d+)?)/);
-        if (numberMatch) {
-            return parseFloat(numberMatch[1]);
-        }
-        
-        return 10; // Default far distance
-    };
+    }, [parkingSpots, sortParkingsByDistance, userLocation]);
 
     // Get display distance text - exactly like distance-badge
     const getDistanceText = (parking) => {
@@ -314,98 +345,80 @@ export default function AllParkings() {
         return description.split('•').map(item => item.trim()).filter(item => item);
     };
 
-    const getImageUrl = (image) => {
-        if (!image || image === 'null') {
-            return '/images/default-parking.jpg';
-        }
-        
-        // Check if image already has full URL
-        if (image.startsWith('http')) {
-            return image;
-        }
-        
-        // Remove leading slash if present to avoid double slashes
-        const imagePath = image.startsWith('/') ? image.substring(1) : image;
-        
-        // Construct full URL using BASE_URL
-        return `${BASE_URL}${imagePath}`;
-    };
-
-    if (loading) {
-        return <Spinner />;
-    }
-
     const displayParkings = filteredParkings.length > 0 ? filteredParkings : parkingSpots;
 
     return (
-        <div className="container py-5">
-            <div className="row mb-4 text-end">
-                <div className="col-12">
-                    <button 
-                        className="btn btn-outline-secondary mb-3"
-                        onClick={() => navigate("/")}
-                    >
-                        Back to Home
-                    </button>
-                    
-                    <div className="section-header text-center mb-4">
-                        <span className="section-badge">ALL PARKINGS</span>
-                        <h2 className="section-title">
-                            {userLocation ? "Parkings Near You" : "Explore All Locations"}
-                        </h2>
-                        {userLocation && userArea ? (
-                            <p className="section-subtitle">
-                                Showing parkings near <strong>{userArea}</strong>, sorted by distance
-                            </p>
-                        ) : userLocation ? (
-                            <p className="section-subtitle">
-                                Sorted by distance from your current location
-                            </p>
-                        ) : (
-                            <p className="section-subtitle">
-                                Discover available parking spots
-                            </p>
-                        )}
+        <main className="parkings-page">
+            <div className="parkings-shell">
+                <div className="parkings-page-head">
+                    <div>
+                        <button
+                            type="button"
+                            className="parkings-back-btn"
+                            onClick={() => navigate("/")}
+                        >
+                            <FaArrowLeft />
+                            Back to Home
+                        </button>
+                        <h1 className="parkings-title">
+                            {userLocation ? "Parkings Near You" : "All Parking Locations"}
+                        </h1>
+                        <p className="parkings-subtitle">
+                            {userLocation && userArea ? (
+                                <>Showing available parking near <strong>{userArea}</strong>, sorted by distance.</>
+                            ) : userLocation ? (
+                                "Parking locations are sorted by distance from your current position."
+                            ) : (
+                                "Browse secure parking locations, compare slots, and book the right spot faster."
+                            )}
+                        </p>
+                    </div>
+
+                    <div className="parkings-summary-panel">
+                        <div>
+                            <span>{displayParkings.length}</span>
+                            <p>Locations</p>
+                        </div>
+                        <div>
+                            <span>{displayParkings.reduce((total, spot) => total + Number(spot.available_slots || 0), 0)}</span>
+                            <p>Available Slots</p>
+                        </div>
                     </div>
                 </div>
-            </div>
 
-            {/* Location Status */}
-            {locationError && (
-                <div className="row mb-4">
-                    <div className="col-12">
-                        <div className="alert alert-warning d-flex justify-content-between align-items-center">
-                            <div>
-                                <i className="fas fa-location-crosshairs me-2"></i>
-                                {locationError}
+                {locationError && (
+                    <div className="parkings-alert parkings-alert-warning">
+                        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                            <div className="flex items-start gap-3">
+                                <FaLocationArrow className="mt-1 shrink-0" />
+                                <span>{locationError}</span>
                             </div>
-                            <button 
-                                className="btn btn-sm btn-outline-primary"
+                            <button
+                                type="button"
+                                className="parkings-small-btn"
                                 onClick={retryLocation}
                                 disabled={locationLoading}
                             >
                                 {locationLoading ? (
                                     <>
-                                        <span className="spinner-border spinner-border-sm me-2"></span>
+                                        <span className="size-4 animate-spin rounded-full border-2 border-blue-600 border-r-transparent" />
                                         Detecting...
                                     </>
                                 ) : (
                                     <>
-                                        <i className="fas fa-redo me-2"></i>
+                                        <FaRedo className="text-xs" />
                                         Retry
                                     </>
                                 )}
                             </button>
                         </div>
                     </div>
-                </div>
-            )}
+                )}
 
-            {userLocation && !locationError && (
-                <div className="row mb-4">
-                    <div className="col-12">
-                        <div className="alert alert-success" style={{textAlign: 'center'}}>
-                            <i className="fas fa-check-circle me-2"></i>
+                {userLocation && !locationError && (
+                    <div className="parkings-alert parkings-alert-success">
+                        <div className="inline-flex items-center gap-2">
+                            <FaCheckCircle />
                             <span>
                                 {userArea ? (
                                     <>Showing parkings near <strong>{userArea}</strong></>
@@ -415,169 +428,97 @@ export default function AllParkings() {
                             </span>
                         </div>
                     </div>
-                </div>
-            )}
+                )}
 
-            <div className="row g-4">
-                {displayParkings.map((spot, index) => {
-                    const features = parseParkingFeatures(spot.description);
-                    const isNearby = userLocation && index < 3;
-                    
-                    return (
-                        <div key={spot.id} className="col-lg-4 col-md-6">
-                            <div 
-                                className="parking-card card h-100 shadow-hover"
+                <div className="parkings-grid">
+                    {displayParkings.map((spot, index) => {
+                        const features = parseParkingFeatures(spot.description).slice(0, 3);
+                        const isNearby = userLocation && index < 3;
+
+                        return (
+                            <article
+                                key={spot.id}
+                                className="parking-list-card"
                                 onClick={() => handleParkingSpotClick(spot.id)}
-                                style={{
-                                    position: 'relative',
-                                    transition: 'transform 0.3s ease, box-shadow 0.3s ease',
-                                    cursor: 'pointer',
-                                    border: 'none',
-                                    borderRadius: '15px',
-                                    overflow: 'hidden'
-                                }}
                             >
-                                {/* Distance Ribbon for nearby parkings */}
-                                {isNearby && (
-                                    <div style={{
-                                        position: 'absolute',
-                                        top: '10px',
-                                        left: '-5px',
-                                        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                                        color: 'white',
-                                        padding: '5px 15px',
-                                        borderRadius: '0 20px 20px 0',
-                                        fontSize: '0.8rem',
-                                        fontWeight: 'bold',
-                                        zIndex: 2,
-                                        boxShadow: '0 2px 5px rgba(0,0,0,0.2)'
-                                    }}>
-                                        <i className="fas fa-location-arrow me-1"></i>
-                                        {index === 0 ? 'Nearest' : index === 1 ? '2nd Nearest' : '3rd Nearest'}
-                                    </div>
-                                )}
-                                
-                                <div style={{
-                                    position: 'relative',
-                                    overflow: 'hidden',
-                                    height: '200px'
-                                }}>
-                                    <img 
-                                        src={getImageUrl(spot.image)} 
-                                        className="card-img-top" 
+                                <div className="parking-card-media">
+                                    <img
+                                        src={resolveImageUrl(spot.image, index)}
                                         alt={spot.name}
-                                        onError={(e) => {
-                                            e.target.src = '/images/default-parking.jpg';
-                                        }}
-                                        style={{
-                                            width: '100%',
-                                            height: '100%',
-                                            objectFit: 'cover',
-                                            transition: 'transform 0.3s ease'
-                                        }}
+                                        onError={(event) => handleParkingImageError(event, index)}
+                                        className="parking-card-img"
                                     />
-                                    <div style={{
-                                        position: 'absolute',
-                                        top: '10px',
-                                        right: '10px'
-                                    }}>
-                                        <span style={{
-                                            padding: '5px 12px',
-                                            borderRadius: '20px',
-                                            fontSize: '0.75rem',
-                                            fontWeight: 'bold',
-                                            background: spot.available_slots > 0 ? '#28a745' : '#dc3545',
-                                            color: 'white'
-                                        }}>
-                                            {spot.available_slots > 0 ? 
-                                                `${spot.available_slots} Slots` : 
-                                                'Fully Booked'
-                                            }
-                                        </span>
-                                    </div>
-                                    <div style={{
-                                        position: 'absolute',
-                                        bottom: '10px',
-                                        left: '10px',
-                                        background: 'rgba(0,0,0,0.8)',
-                                        color: 'white',
-                                        padding: '5px 12px',
-                                        borderRadius: '15px',
-                                        fontSize: '0.75rem',
-                                        backdropFilter: 'blur(10px)'
-                                    }}>
-                                        <i className="fas fa-location-dot me-1"></i>
+                                    <div className="parking-card-shade" />
+                                    {isNearby && (
+                                        <div className="parking-nearest-badge">
+                                            <FaLocationArrow />
+                                            {index === 0 ? 'Nearest' : index === 1 ? '2nd Nearest' : '3rd Nearest'}
+                                        </div>
+                                    )}
+                                    <span
+                                        className={[
+                                            "parking-slot-badge",
+                                            spot.available_slots > 0 ? "is-available" : "is-full",
+                                        ].join(" ")}
+                                    >
+                                        {spot.available_slots > 0 ? `${spot.available_slots} Slots` : 'Fully Booked'}
+                                    </span>
+                                    <div className="parking-distance-badge">
+                                        <FaMapMarkerAlt />
                                         {getDistanceText(spot)}
                                     </div>
                                 </div>
-                                
-                                <div className="card-body">
-                                    <div className="d-flex justify-content-between align-items-start mb-3">
-                                        <h5 className="card-title mb-0">{spot.name}</h5>
-                                        <div className="rating">
-                                            <i className="fas fa-star text-warning"></i>
-                                            <span className="ms-1">4.5</span>
+
+                                <div className="parking-card-content">
+                                    <div className="parking-card-heading">
+                                        <h2 className="parking-card-title">{spot.name}</h2>
+                                        <div className="parking-rating">
+                                            <FaStar />
+                                            <span>4.5</span>
                                         </div>
-                                    </div>
-                                    
-                                    {/* Location Area - Dynamic from real coordinates */}
-                                    <div style={{
-                                        fontSize: '0.9rem',
-                                        padding: '8px 12px',
-                                        background: '#f8f9fa',
-                                        borderRadius: '8px',
-                                        borderLeft: '3px solid #007bff',
-                                        marginBottom: '1rem'
-                                    }}>
-                                        <i className="fas fa-map-marker-alt text-primary me-2"></i>
-                                        <span className="text-muted">{getAreaName(spot)}</span>
-                                    </div>
-                                    
-                                    {/* Parsed Features */}
-                                    <div style={{
-                                        maxHeight: '80px',
-                                        overflowY: 'auto',
-                                        marginBottom: '1rem'
-                                    }}>
-                                        {features.map((feature, index) => (
-                                            <div key={index} style={{
-                                                fontSize: '0.85rem',
-                                                marginBottom: '5px'
-                                            }}>
-                                                <i className="fas fa-check-circle text-success me-2"></i>
-                                                <span>{feature}</span>
-                                            </div>
-                                        ))}
                                     </div>
 
-                                    {/* Additional Info */}
-                                    <div style={{ fontSize: '0.8rem' }}>
-                                        <div style={{ marginBottom: '3px' }}>
-                                            <i className="fas fa-car me-2"></i>
+                                    <div className="parking-area-chip">
+                                        <FaMapMarkerAlt />
+                                        <span>{getAreaName(spot)}</span>
+                                    </div>
+
+                                    <div className="parking-feature-list">
+                                        {features.length > 0 ? (
+                                            features.map((feature, featureIndex) => (
+                                                <div key={featureIndex} className="flex items-start gap-2">
+                                                    <FaCheckCircle />
+                                                    <span>{feature}</span>
+                                                </div>
+                                            ))
+                                        ) : (
+                                            <p>Secure parking with convenient access.</p>
+                                        )}
+                                    </div>
+
+                                    <div className="parking-meta-list">
+                                        <div>
+                                            <FaCar />
                                             <span>Total: {spot.total_slots} slots</span>
                                         </div>
-                                        <div style={{ marginBottom: '3px' }}>
-                                            <i className="fas fa-clock me-2"></i>
+                                        <div>
+                                            <FaClock />
                                             <span>24/7 Access</span>
                                         </div>
                                     </div>
 
-                                    <div className="card-footer mt-4 bg-transparent border-0">
-                                        <div className="d-flex justify-content-between align-items-center">
-                                            <div className="price-info">
-                                                <div style={{
-                                                    fontSize: '1.25rem',
-                                                    fontWeight: 'bold',
-                                                    color: '#2c3e50'
-                                                }}>
-                                                    <b>৳</b> {spot.price_per_hour}/hr
-                                                </div>
-                                                <div className="price-note text-muted" style={{ fontSize: '0.75rem' }}>
-                                                    Incl. all taxes
-                                                </div>
+                                    <div className="parking-card-footer">
+                                        <div className="parking-card-footer-row">
+                                            <div>
+                                                <div className="parking-price">BDT {spot.price_per_hour}/hr</div>
+                                                <div className="parking-price-note">Incl. all taxes</div>
                                             </div>
-                                            <button 
-                                                className={`btn ${spot.available_slots > 0 ? 'btn-primary' : 'btn-secondary'}`}
+                                            <button
+                                                type="button"
+                                                className={[
+                                                    "parking-book-btn",
+                                                    spot.available_slots > 0 ? "" : "is-disabled",
+                                                ].join(" ")}
                                                 disabled={spot.available_slots === 0}
                                                 onClick={(e) => {
                                                     e.stopPropagation();
@@ -589,21 +530,21 @@ export default function AllParkings() {
                                         </div>
                                     </div>
                                 </div>
-                            </div>
-                        </div>
-                    );
-                })}
-            </div>
-
-            {displayParkings.length === 0 && !loading && (
-                <div className="text-center py-5">
-                    <div className="empty-state">
-                        <i className="fas fa-parking fa-3x text-muted mb-3"></i>
-                        <h4>No Parking Spots Available</h4>
-                        <p className="text-muted">Check back later for new locations</p>
-                    </div>
+                            </article>
+                        );
+                    })}
                 </div>
-            )}
-        </div>
+
+                {displayParkings.length === 0 && !loading && (
+                    <div className="py-16 text-center">
+                        <div className="parkings-empty-card">
+                            <FaParking />
+                            <h2>No Parking Spots Available</h2>
+                            <p>Check back later for new locations</p>
+                        </div>
+                    </div>
+                )}
+            </div>
+        </main>
     );
 }

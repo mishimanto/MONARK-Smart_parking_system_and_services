@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useCallback, useState, useEffect } from "react";
 import { adminAPI } from "../../api/client";
 import Swal from "sweetalert2";
 
@@ -23,7 +23,7 @@ export default function AdminCheckouts() {
   const [perPage] = useState(10);
 
   // Fetch stats from database
-  const fetchStats = async () => {
+  const fetchStats = useCallback(async () => {
     try {
       const response = await adminAPI.getCheckoutStats();
       if (response.data.success) {
@@ -32,10 +32,10 @@ export default function AdminCheckouts() {
     } catch (error) {
       console.error("Failed to fetch stats:", error);
     }
-  };
+  }, []);
 
   // Fetch pending checkouts
-  const fetchPendingCheckouts = async (p = 1) => {
+  const fetchPendingCheckouts = useCallback(async (p = 1) => {
     try {
       setLoading(true);
       const response = await adminAPI.getPendingCheckouts({ 
@@ -68,11 +68,11 @@ export default function AdminCheckouts() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [fetchStats, perPage, searchTerm]);
 
   useEffect(() => {
     fetchPendingCheckouts(page);
-  }, [searchTerm, page]);
+  }, [fetchPendingCheckouts, page]);
 
   // Handle search
   const handleSearch = (e) => {

@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import axios from "axios";
+import { API_BASE_URL } from "../../api/client";
 
 export default function AdminBookings() {
   const [bookings, setBookings] = useState([]);
@@ -14,11 +15,11 @@ export default function AdminBookings() {
   const [page, setPage] = useState(1);
   const [perPage] = useState(15);
 
-  const fetchBookings = async (p = 1) => {
+  const fetchBookings = useCallback(async (p = 1) => {
     setLoading(true);
     try {
       const token = localStorage.getItem('token');
-      const res = await axios.get(`http://127.0.0.1:8000/api/admin/bookings`, {
+      const res = await axios.get(`${API_BASE_URL}/admin/bookings`, {
         params: { 
           page: p, 
           per_page: perPage, 
@@ -48,11 +49,11 @@ export default function AdminBookings() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [perPage, q]);
 
   useEffect(() => {
     fetchBookings(page);
-  }, [page]);
+  }, [fetchBookings, page]);
 
   const handleSearch = (e) => {
     e.preventDefault();

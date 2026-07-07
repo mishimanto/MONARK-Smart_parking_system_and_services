@@ -15,7 +15,7 @@
         <p><strong>Service:</strong> {{ $order->service->name }}</p>
         <p><strong>Booking Time:</strong> {{ $order->booking_time }}</p>
         <p><strong>Duration:</strong> {{ $order->service->duration }}</p>
-        <p><strong>Price:</strong> ৳{{ number_format($order->service->price, 2) }}</p>
+        <p><strong>Price:</strong> BDT {{ number_format($order->service->price, 2) }}</p>
         <p><strong>Slip Number:</strong> {{ $slip['slip_number'] }}</p>
     </div>
     

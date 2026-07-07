@@ -1,11 +1,28 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
-import { FaMapMarkerAlt, FaPhone, FaClock, FaTimes, FaCar, FaCalendarAlt, FaWallet } from "react-icons/fa";
+import { FaMapMarkerAlt, FaPhone, FaClock, FaTimes, FaCar, FaCalendarAlt } from "react-icons/fa";
 import Swal from 'sweetalert2';
+import { API_BASE_URL, APP_BASE_URL } from "../api/client";
 import './css/Services.css';
 
-const API_BASE_URL = "http://127.0.0.1:8000/api";
-const BASE_URL = "http://127.0.0.1:8000/";
+const BASE_URL = `${APP_BASE_URL}/`;
+const SERVICE_FALLBACKS = ["/images/parking-hero-3.jpg", "/images/parking-hero-2.jpg", "/images/parking-hero.png"];
+
+const getServiceFallback = (index = 0) => SERVICE_FALLBACKS[index % SERVICE_FALLBACKS.length];
+
+const resolveServiceImage = (image, index = 0) => {
+  if (!image || image === "null" || image === "undefined") return getServiceFallback(index);
+  const imageValue = String(image).trim();
+  if (/^https?:\/\//i.test(imageValue)) return imageValue;
+  if (imageValue.startsWith("/images/")) return imageValue;
+  return `${BASE_URL}${imageValue.replace(/^\/+/, "")}`;
+};
+
+const handleServiceImageError = (event, index = 0) => {
+  const fallback = getServiceFallback(index);
+  if (event.currentTarget.src.endsWith(fallback)) return;
+  event.currentTarget.src = fallback;
+};
 
 
 export default function Services() {
@@ -18,7 +35,7 @@ export default function Services() {
   const [bookingTime, setBookingTime] = useState("");
   const [userLocation, setUserLocation] = useState(null);
   const [selectedCenter, setSelectedCenter] = useState(null);
-  const [userData, setUserData] = useState(null);
+  const [userData] = useState(null);
 
   useEffect(() => {
     fetchServices();
@@ -37,7 +54,7 @@ export default function Services() {
             longitude: position.coords.longitude
           });
         },
-        (error) => {
+        () => {
           console.log("Location access denied or unavailable");
           setUserLocation({
             latitude: 23.8103,
@@ -158,15 +175,15 @@ export default function Services() {
           <div style="background: #f8f9fa; padding: 10px; border-radius: 5px; margin: 10px 0;">
             <div style="display: flex; justify-content: space-between;">
               <span>Service Price:</span>
-              <strong>৳ ${service.price}</strong>
+              <strong>BDT ${service.price}</strong>
             </div>
             <div style="display: flex; justify-content: space-between;">
               <span>Your Balance:</span>
-              <strong style="color: #dc3545;">৳ ${userData.wallet_balance}</strong>
+              <strong style="color: #dc3545;">BDT ${userData.wallet_balance}</strong>
             </div>
             <div style="display: flex; justify-content: space-between; margin-top: 5px;">
               <span>Required:</span>
-              <strong style="color: #dc3545;">৳ ${(parseFloat(service.price) - parseFloat(userData.wallet_balance)).toFixed(2)} more</strong>
+              <strong style="color: #dc3545;">BDT ${(parseFloat(service.price) - parseFloat(userData.wallet_balance)).toFixed(2)} more</strong>
             </div>
           </div>
         </div>
@@ -241,15 +258,15 @@ export default function Services() {
           <div style="background: #f8f9fa; padding: 10px; border-radius: 5px; margin: 10px 0;">
             <div style="display: flex; justify-content: space-between;">
               <span>Service Price:</span>
-              <strong>৳ ${bookingService.price}</strong>
+              <strong>BDT ${bookingService.price}</strong>
             </div>
             <div style="display: flex; justify-content: space-between;">
               <span>Your Balance:</span>
-              <strong style="color: #dc3545;">৳ ${userData.wallet_balance}</strong>
+              <strong style="color: #dc3545;">BDT ${userData.wallet_balance}</strong>
             </div>
             <div style="display: flex; justify-content: space-between; margin-top: 5px;">
               <span>Required:</span>
-              <strong style="color: #dc3545;">৳ ${(parseFloat(bookingService.price) - parseFloat(userData.wallet_balance)).toFixed(2)} more</strong>
+              <strong style="color: #dc3545;">BDT ${(parseFloat(bookingService.price) - parseFloat(userData.wallet_balance)).toFixed(2)} more</strong>
             </div>
           </div>
         </div>
@@ -318,11 +335,11 @@ export default function Services() {
             <div style="background: #f8f9fa; padding: 10px; border-radius: 5px; margin: 10px 0;">
               <div style="display: flex; justify-content: space-between;">
                 <span>Service Price:</span>
-                <strong>৳ ${bookingService.price}</strong>
+                <strong>BDT ${bookingService.price}</strong>
               </div>
               <div style="display: flex; justify-content: space-between;">
                 <span>Your Balance:</span>
-                <strong style="color: #dc3545;">৳ ${userData?.wallet_balance || 0}</strong>
+                <strong style="color: #dc3545;">BDT ${userData?.wallet_balance || 0}</strong>
               </div>
             </div>
           </div>
@@ -355,7 +372,7 @@ export default function Services() {
   }
 };
 
-  const openGoogleMaps = (latitude, longitude, address) => {
+  const openGoogleMaps = (latitude, longitude) => {
     const url = `https://www.google.com/maps?q=${latitude},${longitude}&ll=${latitude},${longitude}&z=15`;
     window.open(url, '_blank');
   };
@@ -381,17 +398,6 @@ export default function Services() {
     });
   };
 
-  if (loading) {
-    return (
-      <div className="services-container">
-        <div className="services-loading-spinner">
-          <div className="services-spinner"></div>
-          <p>Loading services...</p>
-        </div>
-      </div>
-    );
-  }
-
   const sortedServiceCenters = getSortedServiceCenters();
 
   return (
@@ -399,7 +405,7 @@ export default function Services() {
       {/* Existing Services Section - No Changes */}
       <div className="services-header">
         <h1 className="services-title">Car Wash Services</h1>
-        <p className="services-subtitle">Professional car cleaning services with competitive pricing</p>
+        
       </div>
 
       {error && (
@@ -411,40 +417,39 @@ export default function Services() {
 
       <div className="services-grid">
         {services.length > 0 ? (
-          services.map((service) => (
+          services.map((service, index) => (
             <div key={service.id} className="service-card">
               <div className="service-image-container">
-                {service.image ? (
-                  <img
-                    src={`${BASE_URL}${service.image}`}
-                    alt={service.name}
-                    className="service-image"
-                    onError={(e) => (e.target.alt = "Image not available")}
-                  />
-                ) : (
-                  <div className="service-no-image">Image not available</div>
-                )}
+                <img
+                  src={resolveServiceImage(service.image, index)}
+                  alt={service.name}
+                  className="service-image"
+                  onError={(event) => handleServiceImageError(event, index)}
+                />
+                <div className="service-image-shade" />
+                <span className="service-image-price">BDT {service.price}</span>
               </div>
 
               <div className="service-content">
                 <h3 className="service-title">{service.name}</h3>
                 <p className="service-description">{service.description}</p>
                 
-                <div className="service-details">
-                  <div className="service-price">
-                    <span className="service-amount">৳ {service.price}</span>
-                    <span className="service-currency">BDT</span>
+                <div className="service-action-row">
+                  <div className="service-details">
+                    <div className="service-price">
+                      <span className="service-amount">BDT {service.price}</span>
+                    </div>
+                    <div className="service-duration">
+                      <FaClock className="service-time-icon" />
+                      <span className="service-time">{service.duration}</span>
+                    </div>
                   </div>
-                  <div className="service-duration">
-                    <span className="service-time-icon">⏱️</span>
-                    <span className="service-time">{service.duration}</span>
-                  </div>
-                </div>
 
-                <button className="service-book-btn" onClick={() => handleBookClick(service)}>
-                  <FaCalendarAlt className="btn-icon" />
-                  Book Now
-                </button>
+                  <button className="service-book-btn" onClick={() => handleBookClick(service)}>
+                    <FaCalendarAlt className="btn-icon" />
+                    Book Now
+                  </button>
+                </div>
               </div>
             </div>
           ))
@@ -461,14 +466,19 @@ export default function Services() {
 
       {/* New Service Centers Section - List View */}
       <div className="service-centers-section">
-        <div className="service-centers-header">
-          <h2 className="service-centers-title">Our Service Centers</h2>
-          <p className="service-centers-subtitle">
+        <div className="services-header">
+          <h2 className="services-title">
             {userLocation ? 
               "Service centers near your location" : 
               "Find our service centers across the city"
             }
-          </p>
+          </h2>
+          {/* <p className="service-centers-subtitle">
+            {userLocation ? 
+              "Service centers near your location" : 
+              "Find our service centers across the city"
+            }
+          </p> */}
         </div>
 
         {centersLoading ? (
@@ -479,72 +489,73 @@ export default function Services() {
         ) : (
           <div className="service-centers-list">
             {sortedServiceCenters.map((center, index) => {
-              const distance = userLocation ? 
-                calculateDistance(
-                  userLocation.latitude, 
-                  userLocation.longitude, 
-                  center.latitude, 
-                  center.longitude
-                ) : null;
+              const centerDistance = userLocation
+                ? calculateDistance(
+                    userLocation.latitude,
+                    userLocation.longitude,
+                    center.latitude,
+                    center.longitude
+                  )
+                : null;
 
               return (
-                <div 
+                <article
                   key={center.id} 
                   className="service-center-item"
                   onClick={() => setSelectedCenter(center)}
                 >
-                  <div className="center-item-header">
-                    <div className="center-item-info">
-                      <h3 className="center-name">
-                        <FaCar className="center-icon" />
-                        {center.name}
+                  <div className="center-card-top">
+                    
+                    <div className="center-card-heading">
+                      <h3>{center.name}</h3>
+                      <div className="center-card-badges">
                         {index === 0 && userLocation && (
-                          <span className="nearest-tag">Nearest to You</span>
+                          <span className="nearest-tag">Nearest</span>
                         )}
-                      </h3>
-                      
+                        {centerDistance && (
+                          <span className="center-distance-tag">{centerDistance} km away</span>
+                        )}
+                      </div>
                     </div>
                   </div>
 
-                  <div className="center-item-details">
-                    <div className="center-contact">
-                    <div className="center-address">
-                        <FaMapMarkerAlt className="address-icon" />
-                        {center.address}
-                      </div>
-                      <div className="center-phone">
-                        <FaPhone className="phone-icon" />
-                        {center.phone}
-                      </div>
-                      <div className="center-hours">
-                        <FaClock className="hours-icon" />
-                        {center.opening_hours}
-                      </div>
+                  <div className="center-card-details">
+                    <div className="center-detail-row is-address">
+                      <FaMapMarkerAlt />
+                      <span>{center.address}</span>
                     </div>
-                    
-                    {/*<div className="center-item-actions">
-                      <button 
-                        className="center-view-btn"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSelectedCenter(center);
-                        }}
-                      >
-                        View Details
-                      </button>
-                      <button 
-                        className="center-map-btn"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          openGoogleMaps(center.latitude, center.longitude, center.address);
-                        }}
-                      >
-                        <FaMapMarkerAlt className="btn-icon" />
-                        Map
-                      </button>
-                    </div>*/}
+                    <div className="center-detail-row">
+                      <FaPhone />
+                      <span>{center.phone}</span>
+                    </div>
+                    <div className="center-detail-row">
+                      <FaClock />
+                      <span>{center.opening_hours}</span>
+                    </div>
                   </div>
-                </div>
+
+                  <div className="center-card-actions">
+                    <button 
+                      className="center-view-btn"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedCenter(center);
+                      }}
+                    >
+                      View Details
+                    </button>
+                    <button 
+                      className="center-map-btn"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openGoogleMaps(center.latitude, center.longitude);
+                      }}
+                    >
+                      <FaMapMarkerAlt className="btn-icon" />
+                      Map
+                    </button>
+                  </div>
+                </article>
               );
             })}
           </div>
@@ -666,10 +677,10 @@ export default function Services() {
             {bookingService.image && (
               <div className="service-modal-image-container">
                 <img
-                  src={`${BASE_URL}${bookingService.image}`}
+                  src={resolveServiceImage(bookingService.image)}
                   alt={bookingService.name}
                   className="service-modal-image"
-                  onError={(e) => (e.target.alt = "Image not available")}
+                  onError={(event) => handleServiceImageError(event)}
                 />
               </div>
             )}
@@ -688,11 +699,10 @@ export default function Services() {
 
               <div className="service-modal-details">
                 <div className="service-modal-price">
-                  <span className="service-modal-amount">৳ {bookingService.price}</span>
-                  <span className="service-modal-currency">BDT</span>
+                  <span className="service-modal-amount">BDT {bookingService.price}</span>
                 </div>
                 <div className="service-modal-duration">
-                  <span className="service-modal-time-icon">⏱️</span>
+                  <FaClock className="service-modal-time-icon" />
                   <span className="service-modal-time">{bookingService.duration}</span>
                 </div>
               </div>

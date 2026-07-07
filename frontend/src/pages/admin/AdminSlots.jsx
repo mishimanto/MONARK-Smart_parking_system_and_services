@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
+import { API_BASE_URL } from "../../api/client";
 
 export default function AdminSlots() {
   const [slots, setSlots] = useState([]);
@@ -21,7 +22,7 @@ export default function AdminSlots() {
     setLoading(true);
     try {
       const token = localStorage.getItem('token');
-      const res = await axios.get(`http://127.0.0.1:8000/api/admin/slots`, {
+      const res = await axios.get(`${API_BASE_URL}/admin/slots`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Accept': 'application/json'
@@ -44,7 +45,7 @@ export default function AdminSlots() {
   const fetchParkings = async () => {
     try {
       const token = localStorage.getItem('token');
-      const res = await axios.get(`http://127.0.0.1:8000/api/admin/parkings`, {
+      const res = await axios.get(`${API_BASE_URL}/admin/parkings`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Accept': 'application/json'
@@ -63,7 +64,7 @@ export default function AdminSlots() {
     e.preventDefault();
     try {
       const token = localStorage.getItem('token');
-      const res = await axios.post(`http://127.0.0.1:8000/api/admin/slots`, formData, {
+      const res = await axios.post(`${API_BASE_URL}/admin/slots`, formData, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Accept': 'application/json',
@@ -87,7 +88,7 @@ export default function AdminSlots() {
     e.preventDefault();
     try {
       const token = localStorage.getItem('token');
-      const res = await axios.put(`http://127.0.0.1:8000/api/admin/slots/${selectedSlot.id}`, formData, {
+      const res = await axios.put(`${API_BASE_URL}/admin/slots/${selectedSlot.id}`, formData, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Accept': 'application/json',
@@ -114,7 +115,7 @@ export default function AdminSlots() {
 
     try {
       const token = localStorage.getItem('token');
-      const res = await axios.delete(`http://127.0.0.1:8000/api/admin/slots/${slotId}`, {
+      const res = await axios.delete(`${API_BASE_URL}/admin/slots/${slotId}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Accept': 'application/json'
@@ -134,7 +135,7 @@ export default function AdminSlots() {
   const toggleSlotAvailability = async (slot) => {
     try {
       const token = localStorage.getItem('token');
-      const res = await axios.put(`http://127.0.0.1:8000/api/admin/slots/${slot.id}/toggle-availability`, {
+      const res = await axios.put(`${API_BASE_URL}/admin/slots/${slot.id}/toggle-availability`, {
         available: !slot.available
       }, {
         headers: {

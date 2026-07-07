@@ -1,6 +1,16 @@
 import axios from 'axios';
 
-export const API_BASE_URL = "http://127.0.0.1:8000/api";
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api";
+export const APP_BASE_URL = API_BASE_URL.replace(/\/api\/?$/, "");
+
+export const getStoredToken = () => localStorage.getItem('token') || sessionStorage.getItem('token');
+
+export const clearAuthData = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    sessionStorage.removeItem('token');
+    sessionStorage.removeItem('user');
+};
 
 // Axios instance
 const api = axios.create({
@@ -14,20 +24,26 @@ const api = axios.create({
 
 // Add token to requests automatically
 api.interceptors.request.use((config) => {
-    const token = localStorage.getItem('token');
+    const token = getStoredToken();
     if (token) {
         config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
 });
 
+api.interceptors.response.use(
+    (response) => response,
+    (error) => {
+        if (error.response?.status === 401) {
+            clearAuthData();
+        }
+        return Promise.reject(error);
+    }
+);
+
 // Auth endpoints - IMPORTANT: Remove try-catch so errors propagate
 export const registerUser = async (formData) => {
-    const response = await api.post('/register', formData, {
-        headers: {
-            'Content-Type': 'multipart/form-data'
-        }
-    });
+    const response = await api.post('/register', formData);
     return response.data;
 };
 
@@ -38,13 +54,14 @@ export const loginUser = async (form) => {
     });
     return response.data;
   } catch (error) {
-    // Check if backend returned 401
     if (error.response && error.response.status === 401) {
-      // Return friendly message instead of throwing
       return { message: "Invalid email or password" };
     }
 
-    // Any other error
+    if (error.response?.data?.message) {
+      return { message: error.response.data.message };
+    }
+
     return { message: "Network or server error. Please try again." };
   }
 };
@@ -52,7 +69,7 @@ export const loginUser = async (form) => {
 
 
 // client.js - getMe function update
-export const getMe = async (token) => {
+export const getMe = async () => {
     try {
         const response = await api.get('/me');
         return response.data;
@@ -64,8 +81,7 @@ export const getMe = async (token) => {
 
 export const logoutUser = async () => {
     const response = await api.post('/logout');
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
+    clearAuthData();
     return response.data;
 };
 
@@ -160,18 +176,14 @@ export const sendMessage = (data) => axios.post(`${API_BASE_URL}/messages`, data
 // Better: Use axios for all services functions
 // api/client.js এ
 export const getAdminServices = async (page = 1, perPage = 10) => {
-  try {
-    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-    const response = await axios.get(`${API_BASE_URL}/admin/services?page=${page}&per_page=${perPage}`, {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      }
-    });
-    return response.data;
-  } catch (error) {
-    throw error;
-  }
+  const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+  const response = await axios.get(`${API_BASE_URL}/admin/services?page=${page}&per_page=${perPage}`, {
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    }
+  });
+  return response.data;
 };
 
 export const createService = async (serviceData) => {
@@ -274,50 +286,38 @@ export const uploadServiceImage = async (formData) => {
 
 // Get user profile
 export const getProfile = async () => {
-  try {
-    const token = localStorage.getItem('token');
-    const response = await axios.get(`${API_BASE_URL}/profile`, {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      }
-    });
-    return response.data;
-  } catch (error) {
-    throw error;
-  }
+  const token = localStorage.getItem('token');
+  const response = await axios.get(`${API_BASE_URL}/profile`, {
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    }
+  });
+  return response.data;
 };
 
 // Update profile
 export const updateProfile = async (profileData) => {
-  try {
-    const token = localStorage.getItem('token');
-    const response = await axios.put(`${API_BASE_URL}/profile`, profileData, {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      }
-    });
-    return response.data;
-  } catch (error) {
-    throw error;
-  }
+  const token = localStorage.getItem('token');
+  const response = await axios.put(`${API_BASE_URL}/profile`, profileData, {
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    }
+  });
+  return response.data;
 };
 
 // Change password
 export const changePassword = async (passwordData) => {
-  try {
-    const token = localStorage.getItem('token');
-    const response = await axios.put(`${API_BASE_URL}/change-password`, passwordData, {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      }
-    });
-    return response.data;
-  } catch (error) {
-    throw error;
-  }
+  const token = localStorage.getItem('token');
+  const response = await axios.put(`${API_BASE_URL}/change-password`, passwordData, {
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    }
+  });
+  return response.data;
 };
 
 // Forgot Password API calls

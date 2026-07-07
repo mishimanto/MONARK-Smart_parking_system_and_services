@@ -13,8 +13,16 @@ return new class extends Migration
      */
     public function up()
     {
+        if (Schema::hasTable('contacts')) {
+            return;
+        }
+
         Schema::create('contacts', function (Blueprint $table) {
             $table->id();
+            $table->string('address')->nullable();
+            $table->string('phone', 50)->nullable();
+            $table->string('email', 100)->nullable();
+            $table->text('map_embed')->nullable();
             $table->timestamps();
         });
     }

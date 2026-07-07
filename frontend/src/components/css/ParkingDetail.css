@@ -1,0 +1,548 @@
+.parking-detail-page {
+    min-height: 100vh;
+    background: #080d22;
+    color: #ffffff;
+    padding: 34px 18px 70px;
+}
+
+.parking-detail-shell {
+    width: min(1180px, 100%);
+    margin: 0 auto;
+}
+
+.parking-detail-topbar {
+    display: flex;
+    justify-content: flex-start;
+    margin-bottom: 20px;
+}
+
+.parking-detail-back {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    border: 0;
+    border-bottom: 3px solid #00f7ff;
+    background: transparent;
+    color: #dce8ff;
+    padding: 0 0 6px;
+    font-size: 14px;
+    font-weight: 800;
+    transition: color 0.2s ease, transform 0.2s ease;
+}
+
+.parking-detail-back:hover {
+    color: #00f7ff;
+    transform: translateX(-3px);
+}
+
+.parking-detail-hero {
+    display: grid;
+    grid-template-columns: minmax(0, 1.08fr) minmax(360px, 0.92fr);
+    gap: 28px;
+    align-items: stretch;
+}
+
+.parking-detail-media,
+.parking-detail-info,
+.parking-slots-panel,
+.parking-booking-panel {
+    background: #11182e;
+    border: 1px solid rgba(0, 247, 255, 0.16);
+    box-shadow: 0 22px 58px rgba(0, 0, 0, 0.28);
+}
+
+.parking-detail-media {
+    position: relative;
+    min-height: 455px;
+    overflow: hidden;
+    border-radius: 8px;
+}
+
+.parking-detail-media img {
+    width: 100%;
+    height: 100%;
+    min-height: 455px;
+    object-fit: cover;
+    display: block;
+    filter: saturate(1.05) contrast(1.05);
+}
+
+.parking-detail-media-shade {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, rgba(8, 13, 34, 0.08), rgba(8, 13, 34, 0.74));
+    pointer-events: none;
+}
+
+.parking-detail-status {
+    position: absolute;
+    left: 20px;
+    bottom: 20px;
+    display: inline-flex;
+    align-items: center;
+    min-height: 38px;
+    padding: 9px 14px;
+    border-radius: 6px;
+    background: rgba(8, 13, 34, 0.86);
+    color: #ffffff;
+    border: 1px solid rgba(0, 247, 255, 0.35);
+    font-size: 13px;
+    font-weight: 800;
+}
+
+.parking-detail-status.is-open {
+    color: #00f7ff;
+}
+
+.parking-detail-status.is-full {
+    color: #ff6b8b;
+    border-color: rgba(255, 107, 139, 0.45);
+}
+
+.parking-detail-info {
+    border-radius: 8px;
+    padding: 30px;
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+}
+
+.parking-detail-kicker,
+.parking-section-head span,
+.parking-booking-head span,
+.parking-wallet-card span,
+.parking-selected-slot span,
+.parking-price-summary span {
+    color: #00f7ff;
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0;
+    text-transform: uppercase;
+}
+
+.parking-detail-title-row h1 {
+    margin: 10px 0 12px;
+    color: #ffffff;
+    font-size: clamp(30px, 4vw, 48px);
+    font-weight: 800;
+    line-height: 1.05;
+}
+
+.parking-detail-title-row p {
+    margin: 0;
+    color: #aab6cf;
+    font-size: 16px;
+    line-height: 1.8;
+}
+
+.parking-detail-meta {
+    display: grid;
+    gap: 12px;
+}
+
+.parking-detail-meta-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 46px;
+    padding: 12px 14px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.045);
+    color: #dbe6fb;
+    font-size: 14px;
+    font-weight: 700;
+}
+
+.parking-detail-meta-item svg,
+.parking-wallet-card > svg {
+    color: #00f7ff;
+    font-size: 20px;
+    flex: 0 0 auto;
+}
+
+.parking-detail-stats {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.parking-stat-card {
+    min-height: 122px;
+    border-radius: 8px;
+    padding: 16px;
+    background: #161e35;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+.parking-stat-card svg {
+    color: #00f7ff;
+    font-size: 24px;
+}
+
+.parking-stat-card span {
+    color: #aab6cf;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.parking-stat-card strong {
+    color: #ffffff;
+    font-size: 24px;
+    font-weight: 800;
+}
+
+.parking-stat-card.is-accent {
+    background: #00f7ff;
+    border-color: #00f7ff;
+}
+
+.parking-stat-card.is-accent svg,
+.parking-stat-card.is-accent span,
+.parking-stat-card.is-accent strong {
+    color: #061023;
+}
+
+.parking-wallet-card {
+    display: flex;
+    gap: 15px;
+    align-items: flex-start;
+    border-radius: 8px;
+    padding: 18px;
+    background: rgba(255, 182, 39, 0.08);
+    border: 1px solid rgba(255, 182, 39, 0.22);
+}
+
+.parking-wallet-card strong {
+    display: block;
+    color: #ffffff;
+    font-size: 26px;
+    font-weight: 800;
+    margin-top: 4px;
+}
+
+.parking-wallet-card p {
+    margin: 7px 0 0;
+    color: #ffb627;
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.parking-booking-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 365px;
+    gap: 28px;
+    margin-top: 28px;
+    align-items: start;
+}
+
+.parking-slots-panel,
+.parking-booking-panel {
+    border-radius: 8px;
+    padding: 24px;
+}
+
+.parking-section-head,
+.parking-booking-head {
+    margin-bottom: 20px;
+}
+
+.parking-section-head h2,
+.parking-booking-head h2 {
+    margin: 7px 0 0;
+    color: #ffffff;
+    font-size: 24px;
+    font-weight: 800;
+}
+
+.parking-slots-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+    gap: 14px;
+}
+
+.parking-slot-card {
+    min-height: 142px;
+    border: 1px solid rgba(0, 247, 255, 0.16);
+    border-radius: 8px;
+    background: #171f36;
+    color: #ffffff;
+    padding: 15px;
+    text-align: left;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    transition: border-color 0.2s ease, transform 0.2s ease, background 0.2s ease;
+}
+
+.parking-slot-card:hover {
+    border-color: rgba(0, 247, 255, 0.72);
+    background: #1c2741;
+    transform: translateY(-3px);
+}
+
+.parking-slot-card svg {
+    color: #00f7ff;
+    font-size: 24px;
+}
+
+.parking-slot-card strong {
+    font-size: 22px;
+    font-weight: 800;
+}
+
+.parking-slot-card span {
+    color: #aab6cf;
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.parking-slot-card small {
+    width: max-content;
+    border-radius: 5px;
+    background: rgba(0, 247, 255, 0.12);
+    color: #00f7ff;
+    padding: 5px 8px;
+    font-size: 11px;
+    font-weight: 800;
+}
+
+.parking-slot-card.is-selected {
+    background: #00f7ff;
+    border-color: #00f7ff;
+    box-shadow: 0 18px 36px rgba(0, 247, 255, 0.18);
+}
+
+.parking-slot-card.is-selected svg,
+.parking-slot-card.is-selected strong,
+.parking-slot-card.is-selected span,
+.parking-slot-card.is-selected small {
+    color: #061023;
+}
+
+.parking-slot-card.is-selected small {
+    background: rgba(6, 16, 35, 0.12);
+}
+
+.parking-slot-card.is-disabled {
+    cursor: not-allowed;
+    opacity: 0.48;
+    background: #12192d;
+}
+
+.parking-slot-card.is-disabled:hover {
+    border-color: rgba(255, 255, 255, 0.08);
+    transform: none;
+}
+
+.parking-slot-card.is-disabled small {
+    color: #ff6b8b;
+    background: rgba(255, 107, 139, 0.12);
+}
+
+.parking-booking-panel {
+    position: sticky;
+    top: 24px;
+}
+
+.parking-selected-slot {
+    border-radius: 8px;
+    padding: 18px;
+    background: #171f36;
+    border: 1px solid rgba(0, 247, 255, 0.18);
+}
+
+.parking-selected-slot strong {
+    display: block;
+    margin-top: 7px;
+    color: #ffffff;
+    font-size: 34px;
+    font-weight: 800;
+}
+
+.parking-selected-slot p {
+    margin: 5px 0 0;
+    color: #aab6cf;
+    font-size: 14px;
+}
+
+.parking-form-label {
+    display: block;
+    margin-top: 20px;
+    margin-bottom: 8px;
+    color: #ffffff;
+    font-size: 13px;
+    font-weight: 800;
+}
+
+.parking-duration-select {
+    width: 100%;
+    min-height: 48px;
+    border: 1px solid rgba(0, 247, 255, 0.22);
+    border-radius: 8px;
+    background: #0d1428;
+    color: #ffffff;
+    padding: 0 14px;
+    font-size: 14px;
+    font-weight: 700;
+    outline: none;
+}
+
+.parking-duration-select:focus {
+    border-color: #00f7ff;
+    box-shadow: 0 0 0 3px rgba(0, 247, 255, 0.14);
+}
+
+.parking-price-summary {
+    margin-top: 20px;
+    display: grid;
+    gap: 12px;
+}
+
+.parking-price-summary > div {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 14px;
+    padding: 12px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.parking-price-summary strong {
+    color: #ffffff;
+    font-size: 15px;
+    font-weight: 800;
+    text-align: right;
+}
+
+.parking-price-summary .parking-total-row {
+    border-bottom: 0;
+    padding: 16px;
+    border-radius: 8px;
+    background: rgba(0, 247, 255, 0.1);
+}
+
+.parking-total-row strong {
+    color: #00f7ff;
+    font-size: 20px;
+}
+
+.parking-confirm-btn {
+    width: 100%;
+    min-height: 52px;
+    margin-top: 20px;
+    border: 0;
+    border-radius: 8px;
+    background: #00f7ff;
+    color: #061023;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 9px;
+    font-size: 15px;
+    font-weight: 900;
+    transition: transform 0.2s ease, background 0.2s ease;
+}
+
+.parking-confirm-btn:hover {
+    background: #48fbff;
+    transform: translateY(-2px);
+}
+
+.parking-confirm-btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.62;
+    transform: none;
+}
+
+.is-spinning {
+    animation: parking-spin 0.85s linear infinite;
+}
+
+.parking-booking-empty,
+.parking-empty-state {
+    min-height: 260px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.035);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    text-align: center;
+    padding: 26px;
+}
+
+.parking-empty-state {
+    grid-column: 1 / -1;
+}
+
+.parking-booking-empty svg,
+.parking-empty-state svg {
+    color: rgba(0, 247, 255, 0.58);
+    font-size: 46px;
+}
+
+.parking-booking-empty h3,
+.parking-empty-state h3 {
+    margin: 14px 0 7px;
+    color: #ffffff;
+    font-size: 20px;
+    font-weight: 800;
+}
+
+.parking-booking-empty p,
+.parking-empty-state p {
+    margin: 0;
+    max-width: 340px;
+    color: #aab6cf;
+    font-size: 14px;
+    line-height: 1.7;
+}
+
+@keyframes parking-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+@media (max-width: 991px) {
+    .parking-detail-hero,
+    .parking-booking-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .parking-booking-panel {
+        position: static;
+    }
+}
+
+@media (max-width: 640px) {
+    .parking-detail-page {
+        padding: 24px 14px 50px;
+    }
+
+    .parking-detail-media,
+    .parking-detail-media img {
+        min-height: 310px;
+    }
+
+    .parking-detail-info,
+    .parking-slots-panel,
+    .parking-booking-panel {
+        padding: 18px;
+    }
+
+    .parking-detail-stats {
+        grid-template-columns: 1fr;
+    }
+
+    .parking-slots-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .parking-slot-card {
+        min-height: 126px;
+    }
+}

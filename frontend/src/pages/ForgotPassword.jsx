@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { forgotPassword } from "../api/client";
 import { Link } from "react-router-dom";
+import { FaEnvelope, FaPaperPlane, FaRedo, FaCheckCircle } from "react-icons/fa";
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState("");
@@ -42,116 +43,76 @@ export default function ForgotPassword() {
   };
 
   return (
-    <div className="min-vh-100 d-flex align-items-center justify-content-center bg-light">
-      <div className="container-fluid">
-        <div className="row justify-content-center">
-          <div className="col-xl-4 col-lg-4 col-md-5 col-sm-8">
-            <div className="card border-0 shadow-lg rounded-4">
-              <div className="card-body p-5">
-                <div className="text-center mb-4">
-                  <h2 className="fw-bold text-dark">Forgot Password</h2>
-                  <p className="text-muted mt-2">
-                    {emailSent 
-                      ? "Check your email for reset instructions" 
-                      : "Enter your email to receive a password reset link"
-                    }
-                  </p>
-                </div>
+    <section className="auth-card">
+      <div className="auth-card-heading">
+        <h2>Forgot Password</h2>        
+      </div>
 
-                {/* Message Alert */}
                 {message && (
-                  <div
-                    className={`alert mb-4 rounded-2 ${
-                      isError ? "alert-danger" : "alert-success"
-                    }`}
-                  >
+        <div className={`auth-alert ${isError ? "is-error" : "is-success"}`}>
                     {message}
                   </div>
                 )}
 
                 {!emailSent ? (
-                  // Request Reset Form
-                  <form onSubmit={handleSubmit}>
-                    <div className="mb-4">
+        <form onSubmit={handleSubmit} className="auth-form">
+          <label className="auth-field">
+            <FaEnvelope />
                       <input
                         type="email"
-                        className="form-control form-control-lg rounded-2 border-0 bg-light"
                         onChange={(e) => setEmail(e.target.value)}
                         placeholder="Enter your email"
                         required
                         value={email}
-                        style={{ padding: "12px 16px" }}
                       />
-                    </div>
+          </label>
                     <button
                       type="submit"
-                      className="btn btn-primary btn-lg w-100 rounded-2 fw-semibold py-2"
+            className="auth-submit-btn"
                       disabled={isLoading}
-                      style={{
-                        background: "linear-gradient(45deg, #3b82f6, #1d4ed8)",
-                        border: "none",
-                        fontSize: "1.1rem",
-                      }}
                     >
                       {isLoading ? (
                         <>
-                          <span
-                            className="spinner-border spinner-border-sm me-2"
-                            role="status"
-                          ></span>
+                <span className="auth-spinner" />
                           Sending...
                         </>
                       ) : (
-                        "Send Reset Link"
+              <>
+                <FaPaperPlane />
+                Send Reset Link
+              </>
                       )}
                     </button>
                   </form>
                 ) : (
-                  // Success Message
-                  <div className="text-center">
-                    <div className="mb-4">
-                      <i className="fas fa-check-circle text-success fa-3x mb-3"></i>
-                      <p className="text-muted">
+        <div className="auth-success-panel">
+          <FaCheckCircle />
+          <p>
                         We've sent password reset instructions to your email address.
                       </p>
-                    </div>
                     <button
                       onClick={() => {
                         setEmailSent(false);
                         setEmail("");
                         setMessage("");
                       }}
-                      className="btn btn-outline-primary btn-lg w-100 rounded-2 fw-semibold py-2"
+            className="auth-secondary-btn"
                     >
+            <FaRedo />
                       Try Another Email
                     </button>
                   </div>
                 )}
 
-                {/* Back to Login */}
-                <div className="text-center mt-4">
-                  <p className="text-muted mb-0">
+      <div className="auth-links">
+        <p>
                     Remember your password?{" "}
-                    <Link
-                      to="/login"
-                      className="text-primary fw-semibold text-decoration-none ms-1"
-                    >
+          <Link to="/login">
                       Back to Sign in
                     </Link>
                   </p>
                 </div>
-              </div>
-            </div>
-
-            {/* Footer */}
-            <div className="text-center mt-4">
-              <p className="text-muted small">
-                &copy; {new Date().getFullYear()} MONARK. All rights reserved.
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+      
+    </section>
   );
 }

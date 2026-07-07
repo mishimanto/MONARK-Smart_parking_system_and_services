@@ -1,287 +1,289 @@
 import React, { useContext, useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import {
+  FaBars,
+  FaChevronDown,
+  FaEnvelope,
+  FaFacebookF,
+  FaHome,
+  FaInfoCircle,
+  FaInstagram,
+  FaLinkedinIn,
+  FaMapMarkerAlt,
+  FaPhone,
+  FaSignOutAlt,
+  FaTachometerAlt,
+  FaTimes,
+  FaTwitter,
+  FaUserEdit,
+  FaUserTie,
+  FaWrench,
+  FaKey,
+} from "react-icons/fa";
 import { AuthContext } from "../contexts/AuthContext";
-import { logoutUser } from "../api/client";
+import { API_BASE_URL, clearAuthData, getStoredToken, logoutUser } from "../api/client";
 import "./css/Navbar.css";
 
+const navLinks = [
+  { label: "Home", to: "/" },
+  { label: "About", to: "/about" },
+  { label: "Contact Us", to: "/contact" },
+];
+
+const socialLinks = [
+  { label: "Facebook", href: "#", icon: FaFacebookF },
+  { label: "Twitter", href: "#", icon: FaTwitter },
+  { label: "LinkedIn", href: "#", icon: FaLinkedinIn },
+  { label: "Instagram", href: "#", icon: FaInstagram },
+];
+
 export default function Navbar() {
-    const { user, setUser } = useContext(AuthContext);
-    const navigate = useNavigate();
-    const [servicesDropdownOpen, setServicesDropdownOpen] = useState(false);
-    const [userDropdownOpen, setUserDropdownOpen] = useState(false);
-    const [contactInfo, setContactInfo] = useState(null);
+  const { user, setUser, loading: authLoading } = useContext(AuthContext);
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [servicesDropdownOpen, setServicesDropdownOpen] = useState(false);
+  const [userDropdownOpen, setUserDropdownOpen] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
+  const [contactInfo, setContactInfo] = useState(null);
 
-    useEffect(() => {
-        // Fetch contact info from backend
-        fetch("http://127.0.0.1:8000/api/contact-info")
-            .then(res => res.json())
-            .then(data => setContactInfo(data))
-            .catch(err => console.error("Error fetching contact info:", err));
-    }, []);
+  useEffect(() => {
+    fetch(`${API_BASE_URL}/contact-info`)
+      .then((res) => res.json())
+      .then((data) => setContactInfo(data))
+      .catch((err) => console.error("Error fetching contact info:", err));
+  }, []);
 
-    useEffect(() => {
-        const handleScroll = () => {
-            const navbar = document.querySelector('.custom-navbar');
-            if (window.scrollY > 50) {
-                navbar.classList.add('scrolled');
-            } else {
-                navbar.classList.remove('scrolled');
-            }
-        };
+  useEffect(() => {
+    const handleScroll = () => setScrolled(window.scrollY > 40);
+    handleScroll();
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
 
-        window.addEventListener('scroll', handleScroll);
-        return () => window.removeEventListener('scroll', handleScroll);
-    }, []);
+  useEffect(() => {
+    setMobileOpen(false);
+    setServicesDropdownOpen(false);
+    setUserDropdownOpen(false);
+  }, [location.pathname]);
 
-    // Auto-close dropdowns when clicking outside
-    useEffect(() => {
-        const handleClickOutside = () => {
-            setServicesDropdownOpen(false);
-            setUserDropdownOpen(false);
-        };
+  const handleLogout = async () => {
+    const token = getStoredToken();
 
-        document.addEventListener('click', handleClickOutside);
-        return () => document.removeEventListener('click', handleClickOutside);
-    }, []);
+    if (token) {
+      try {
+        await logoutUser();
+      } catch (error) {
+        console.error("Logout request failed:", error);
+      }
+    }
 
-    const handleLogout = async () => {
-        const token = localStorage.getItem("token");
-        if (token) await logoutUser(token);
+    clearAuthData();
+    setUser(null);
+    navigate("/login");
+  };
 
-        localStorage.removeItem("token");
-        localStorage.removeItem("user");
-        setUser(null);
-        navigate("/login");
-    };
+  const isActive = (to) => location.pathname === to;
 
-    const toggleServicesDropdown = (e) => {
-        e.stopPropagation();
-        setServicesDropdownOpen(!servicesDropdownOpen);
-        setUserDropdownOpen(false);
-    };
+  const linkClass = (to) =>
+    [
+      "site-nav-link",
+      isActive(to) ? "is-active" : "",
+    ].join(" ");
 
-    const toggleUserDropdown = (e) => {
-        e.stopPropagation();
-        setUserDropdownOpen(!userDropdownOpen);
-        setServicesDropdownOpen(false);
-    };
+  const dashboardLink =
+    user?.role === "admin"
+      ? { label: "Admin Panel", to: "/admin", icon: FaUserTie }
+      : user?.role === "manager"
+        ? { label: "Manager Panel", to: "/manager", icon: FaUserTie }
+        : user?.role === "mechanic"
+          ? { label: "Mechanic Panel", to: "/mechanic/dashboard", icon: FaWrench }
+          : { label: "Dashboard", to: "/dashboard", icon: FaTachometerAlt };
 
-    const dropdownArrowStyles = {
-        base: {
-            fontSize: '0.7rem',
-            transition: 'transform 0.3s ease'
-        },
-        closed: {
-            transform: 'rotate(0deg)'
-        },
-        open: {
-            transform: 'rotate(180deg)'
-        }
-    };
+  return (
+    <header className="site-header sticky top-0 z-50 w-full">
+      <div className="site-topbar">
+        <div className="site-header-inner site-topbar-inner">
+          <div className="site-contact-list">
+            {contactInfo ? (
+              <>                
+                <span className="inline-flex items-center gap-2">
+                  <FaPhone />
+                  {contactInfo.phone}
+                </span>
+                <span className="inline-flex items-center gap-2">
+                  <FaEnvelope />
+                  {contactInfo.email}
+                </span>
+              </>
+            ) : (
+              <span className="text-slate-300">Loading contact info...</span>
+            )}
+          </div>
 
-    return (
-        <>
-            {/* Enhanced Top Bar */}
-            <div className="top-bar">
-                <div className="container">
-                    <div className="d-flex justify-content-between align-items-center">
-                        <div className="top-bar-left">
-                            <div className="d-flex flex-wrap align-items-center">
-                                {contactInfo ? (
-                                    <>
-                                        <span className="contact-item">
-                                            <i className="fas fa-map-marker-alt"></i>
-                                            {contactInfo.address}
-                                        </span>
-                                        <span className="separator">|</span>
-                                        <span className="contact-item">
-                                            <i className="fas fa-phone"></i>
-                                            {contactInfo.phone}
-                                        </span>
-                                        <span className="separator">|</span>
-                                        <span className="contact-item">
-                                            <i className="fas fa-envelope"></i>
-                                            {contactInfo.email}
-                                        </span>
-                                    </>
-                                ) : (
-                                    <span>Loading contact info...</span>
-                                )}
-                            </div>
-                        </div>
-                        <div className="top-bar-right">
-                            <div className="social-links">
-                                <a href="#" aria-label="Facebook"><i className="fab fa-facebook-f"></i></a>
-                                <a href="#" aria-label="Twitter"><i className="fab fa-twitter"></i></a>
-                                <a href="#" aria-label="LinkedIn"><i className="fab fa-linkedin-in"></i></a>
-                                <a href="#" aria-label="Instagram"><i className="fab fa-instagram"></i></a>
-                            </div>
-                        </div>
-                    </div>
+          <div className="site-social-list">
+            {socialLinks.map((social) => (
+              <a
+                key={social.label}
+                href={social.href}
+                aria-label={social.label}
+                className="site-social-link"
+              >
+                {React.createElement(social.icon, { className: "text-sm" })}
+              </a>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <nav
+        className={[
+          "site-navbar",
+          scrolled ? "is-scrolled" : "",
+        ].join(" ")}
+      >
+        <div className="site-header-inner site-navbar-inner">
+          <Link to="/" className="site-brand">
+            <span className="site-brand-name">MONARK</span>
+          </Link>
+
+          <button
+            type="button"
+            className="site-mobile-toggle lg:hidden"
+            aria-label="Toggle navigation"
+            onClick={() => setMobileOpen((open) => !open)}
+          >
+            {mobileOpen ? <FaTimes /> : <FaBars />}
+          </button>
+
+          <div className="site-nav-menu hidden lg:flex">
+            {navLinks.map((link) => (
+              <Link key={link.to} to={link.to} className={linkClass(link.to)}>
+                {link.icon && React.createElement(link.icon, { className: "text-xs" })}
+                {link.label}
+              </Link>
+            ))}
+
+            <div className="relative">
+              <button
+                type="button"
+                className={`site-nav-link ${servicesDropdownOpen ? "is-active" : ""}`}
+                onClick={() => {
+                  setServicesDropdownOpen((open) => !open);
+                  setUserDropdownOpen(false);
+                }}
+              >
+                Services
+                <FaChevronDown className={`text-xs transition ${servicesDropdownOpen ? "rotate-180" : ""}`} />
+              </button>
+
+              {servicesDropdownOpen && (
+                <div className="site-dropdown absolute left-0 mt-2 w-48 overflow-hidden py-2">
+                  <Link className="site-dropdown-link" to="/all-parkings">
+                    Parking Lots
+                  </Link>
+                  <Link className="site-dropdown-link" to="/services">
+                    Car Services
+                  </Link>
                 </div>
+              )}
             </div>
+          </div>
 
-            {/* Enhanced Main Navigation Bar */}
-            <nav className="navbar navbar-expand-lg navbar-light custom-navbar">
-                <div className="container-fluid navbar-container">
-                    <Link className="navbar-brand" to="/">
-                        <div className="brand-container">
-                            <span className="brand-text">MONARK</span>
-                        </div>
-                    </Link>
+          <div className="site-auth-area hidden lg:flex">
+            {authLoading ? null : !user ? (
+              <Link
+                to="/login"
+                className="site-login-link"
+              >
+                Login/Register
+              </Link>
+            ) : (
+              <div className="relative">
+                <button
+                  type="button"
+                  className="site-user-button"
+                  onClick={() => {
+                    setUserDropdownOpen((open) => !open);
+                    setServicesDropdownOpen(false);
+                  }}
+                >
+                  {user.name || user.email}
+                  <FaChevronDown className={`text-xs transition ${userDropdownOpen ? "rotate-180" : ""}`} />
+                </button>
+
+                {userDropdownOpen && (
+                  <div className="site-dropdown site-user-dropdown absolute right-0 mt-3 w-54 overflow-hidden">
                     
+                    <Link className="site-dropdown-link" to={dashboardLink.to}>
+                      <dashboardLink.icon className="text-xs" />
+                      {dashboardLink.label}
+                    </Link>
+                    <Link className="site-dropdown-link" to="/user-profile">
+                      <FaUserEdit />
+                      My Profile
+                    </Link>
+                    <Link className="site-dropdown-link" to="/user-profile">
+                      <FaKey />
+                      Change Password
+                    </Link>
+                   
+                    <div className="site-dropdown-divider" />
                     <button
-                        className="navbar-toggler"
-                        type="button"
-                        data-bs-toggle="collapse"
-                        data-bs-target="#navbarNav"
-                        aria-controls="navbarNav"
-                        aria-expanded="false"
-                        aria-label="Toggle navigation"
+                      type="button"
+                      className="site-dropdown-link site-dropdown-logout"
+                      onClick={handleLogout}
                     >
-                        <span className="navbar-toggler-icon"></span>
+                      <FaSignOutAlt />
+                      Logout
                     </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
 
-                    <div className="collapse navbar-collapse" id="navbarNav">
-                        <ul className="navbar-nav mx-auto">
-                            <li className="nav-item">
-                                <Link className="nav-link" to="/">
-                                    <i className="fas fa-home me-1 d-lg-none"></i>
-                                    Home
-                                </Link>
-                            </li>
-                            <li className="nav-item">
-                                <Link className="nav-link" to="/about">
-                                    <i className="fas fa-info-circle me-1 d-lg-none"></i>
-                                    About
-                                </Link>
-                            </li>
-
-                            <li className="nav-item">
-                                <Link className="nav-link" to="/contact">
-                                    <i className="fas fa-phone me-1 d-lg-none"></i>
-                                    Contact Us
-                                </Link>
-                            </li>
-
-                            {/* Services Dropdown - Updated with Sidebar-style effect */}
-                            <li className="nav-item dropdown">
-                                <a 
-                                    className="nav-link dropdown-toggle d-flex align-items-center" 
-                                    href="#" 
-                                    id="servicesDropdown" 
-                                    role="button" 
-                                    data-bs-toggle="dropdown" 
-                                    aria-expanded="false"
-                                    onClick={toggleServicesDropdown}
-                                    style={{ cursor: 'pointer' }}
-                                >
-                                    <i className="fas fa-concierge-bell me-1 d-lg-none"></i>
-                                    Services
-                                    <i 
-                                        className="fas fa-chevron-down ms-1 dropdown-arrow"
-                                        style={{
-                                            ...dropdownArrowStyles.base,
-                                            ...(servicesDropdownOpen ? dropdownArrowStyles.open : dropdownArrowStyles.closed)
-                                        }}
-                                    ></i>
-                                </a>
-                                <ul 
-                                    className="dropdown-menu" 
-                                    aria-labelledby="servicesDropdown"
-                                    style={{ 
-                                        display: servicesDropdownOpen ? 'block' : 'none'
-                                    }}
-                                >
-                                    <li><Link className="dropdown-item" to="/all-parkings">Parking Lots</Link></li>
-                                    <li><Link className="dropdown-item" to="/services">Car Services</Link></li>
-                                </ul>
-                            </li>
-                        </ul>
-
-                        <ul className="navbar-nav align-items-center">
-                            {!user ? (
-                                <>
-                                    <li className="nav-item">
-                                        <Link className="nav-link" to="/login">
-                                            Login/Register
-                                        </Link>
-                                    </li>
-                                </>
-                            ) : (
-                                <>
-                                    {/* User Dropdown - Updated with Sidebar-style effect */}
-                                    <li className="nav-item dropdown user-menu ms-3">
-                                        <a 
-                                            className="nav-link dropdown-toggle d-flex align-items-center" 
-                                            href="#" 
-                                            id="userDropdown" 
-                                            role="button" 
-                                            data-bs-toggle="dropdown" 
-                                            aria-expanded="false"
-                                            onClick={toggleUserDropdown}
-                                            style={{ cursor: 'pointer' }}
-                                        >
-                                            <div className="user-info ms-2 d-none d-md-block d-flex align-items-center">
-                                                <div className="user-name">{user.name || user.email}
-                                                    <i 
-                                                        className="fas fa-chevron-down ms-1 dropdown-arrow"
-                                                        style={{
-                                                            ...dropdownArrowStyles.base,
-                                                            ...(userDropdownOpen ? dropdownArrowStyles.open : dropdownArrowStyles.closed)
-                                                        }}
-                                                    ></i>
-                                                </div>
-                                            </div>
-                                        </a>
-                                        <ul 
-                                            className="dropdown-menu dropdown-menu-end" 
-                                            aria-labelledby="userDropdown"
-                                            style={{ 
-                                                display: userDropdownOpen ? 'block' : 'none'
-                                            }}
-                                        >
-                                            {user.role === "user" && (
-                                                <Link className="dropdown-item" to="/dashboard">
-                                                    <i className="fas fa-tachometer-alt me-1"></i>
-                                                    Dashboard
-                                                </Link>
-                                            )}
-
-                                            {user.role === "mechanic" && (
-                                                <Link className="dropdown-item" to="/mechanic/dashboard">
-                                                    <i className="fas fa-tachometer-alt me-2"></i>
-                                                    Mechanic Panel
-                                                </Link>
-                                            )}
-
-                                            {user.role === "admin" && (
-                                                <Link className="dropdown-item" to="/admin">
-                                                    <i class="fa-solid fa-user-tie me-2"></i>
-                                                    Admin Panel
-                                                </Link>
-                                            )}
-                                            {user.role === "manager" && (
-                                                <Link className="dropdown-item" to="/manager">
-                                                    <i className="fas fa-user-tie me-2"></i>
-                                                    Manager Panel
-                                                </Link>
-                                            )}
-                                            <li><Link className="dropdown-item" to="/user-profile"><i class="fa-solid fa-pen-to-square me-2"></i>My Profile</Link></li>
-                                            <li><hr className="dropdown-divider" /></li>
-                                            <li>
-                                                <button className="dropdown-item text-danger" onClick={handleLogout}>
-                                                    <i className="fas fa-sign-out-alt me-2"></i>Logout
-                                                </button>
-                                            </li>
-                                        </ul>
-                                    </li>
-                                </>
-                            )}
-                        </ul>
-                    </div>
-                </div>
-            </nav>
-        </>
-    );
+        {mobileOpen && (
+          <div className="site-mobile-menu lg:hidden">
+            <div className="flex flex-col gap-1">
+              {navLinks.map((link) => (
+                <Link key={link.to} to={link.to} className={linkClass(link.to)}>
+                  {React.createElement(link.icon, { className: "text-xs" })}
+                  {link.label}
+                </Link>
+              ))}
+              <Link className={linkClass("/all-parkings")} to="/all-parkings">
+                Parking Lots
+              </Link>
+              <Link className={linkClass("/services")} to="/services">
+                Car Services
+              </Link>
+              {authLoading ? null : !user ? (
+                <Link className="site-login-link mt-2 text-center" to="/login">
+                  Login/Register
+                </Link>
+              ) : (
+                <>
+                  <Link className={linkClass(dashboardLink.to)} to={dashboardLink.to}>
+                    {dashboardLink.label}
+                  </Link>
+                  <Link className={linkClass("/user-profile")} to="/user-profile">
+                    My Profile
+                  </Link>
+                  <button
+                    type="button"
+                    className="mt-2 rounded-sm bg-red-50 px-4 py-2 text-left text-sm font-bold text-red-600"
+                    onClick={handleLogout}
+                  >
+                    Logout
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+      </nav>
+    </header>
+  );
 }

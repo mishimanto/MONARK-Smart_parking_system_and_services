@@ -4,7 +4,7 @@ import { AuthContext } from "../../contexts/AuthContext";
 import { getProfile, updateProfile, changePassword } from "../../api/client";
 
 export default function Profile() {
-  const { user, setUser } = useContext(AuthContext);
+  const { setUser } = useContext(AuthContext);
   const [activeTab, setActiveTab] = useState('profile');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });

@@ -1,9 +1,7 @@
 // src/components/admin/ServiceCenters.jsx
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-
-// Base URL for API - adjust this to match your Laravel backend
-const API_BASE_URL = 'http://127.0.0.1:8000/api';
+import { API_BASE_URL } from '../../api/client';
 
 const ServiceCenters = () => {
   const [serviceCenters, setServiceCenters] = useState([]);
@@ -90,7 +88,7 @@ const ServiceCenters = () => {
       
       if (error.response?.status === 404) {
         setError(`API endpoint not found. Please ensure:
-        - Laravel server is running on http://127.0.0.1:8000
+        - Laravel server is running on the configured API host
         - API routes are properly defined
         - You are logged in as admin`);
       } else if (error.response?.status === 401) {
@@ -243,79 +241,6 @@ const ServiceCenters = () => {
     } catch (error) {
       console.error('Error updating status:', error);
       setError(error.response?.data?.message || 'Failed to update status. Please try again.');
-    }
-  };
-
-  // Test API connection
-  const testApiConnection = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get(`${API_BASE_URL}/admin/service-centers`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      
-      // FIXED: Proper data extraction for test
-      const centers = response.data.data && Array.isArray(response.data.data) ? response.data.data : [];
-      console.log('API Test Response:', response);
-      alert(`API connection successful! Found ${centers.length} service centers.`);
-    } catch (error) {
-      console.error('API Test Error:', error);
-      alert('API connection failed: ' + (error.response?.data?.message || error.message));
-    }
-  };
-
-  // Test Laravel server connection
-  const testLaravelServer = async () => {
-    try {
-      const response = await axios.get('http://127.0.0.1:8000');
-      console.log('Laravel Server Response:', response);
-      alert('Laravel server is running!');
-    } catch (error) {
-      console.error('Laravel Server Test Error:', error);
-      alert('Laravel server is not running. Please start it with: php artisan serve');
-    }
-  };
-
-  // Debug function
-  const debugAPI = async () => {
-    const token = localStorage.getItem('token');
-    console.log('=== DEBUG INFO ===');
-    console.log('Token:', token);
-    console.log('API URL:', `${API_BASE_URL}/admin/service-centers`);
-    
-    try {
-      const response = await fetch(`${API_BASE_URL}/admin/service-centers`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Accept': 'application/json'
-        }
-      });
-      
-      console.log('Response Status:', response.status);
-      console.log('Response OK:', response.ok);
-      
-      const text = await response.text();
-      console.log('Raw Response Text:', text);
-      
-      try {
-        const data = JSON.parse(text);
-        console.log('Parsed JSON:', data);
-        
-        // Show extracted data count
-        if (data.data && data.data.data) {
-          console.log('Data count:', data.data.data.length);
-        } else if (data.data) {
-          console.log('Data count:', data.data.length);
-        }
-        
-      } catch (e) {
-        console.log('Response is not JSON');
-      }
-      
-    } catch (error) {
-      console.error('Debug fetch error:', error);
     }
   };
 

@@ -1,13 +1,13 @@
 // src/layouts/AdminLayout.jsx
 import React, { useState, useEffect } from "react";
-import { Outlet, useLocation } from "react-router-dom";
+import { Outlet } from "react-router-dom";
 import Sidebar from "../components/Sidebar";
 import AdminHeader from "../pages/admin/AdminHeader";
 import AdminFooter from "../pages/admin/AdminFooter";
+import "./AdminLayout.css";
 
 export default function AdminLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const location = useLocation();
 
   // Sidebar state preserve korbe even route change holeo
   useEffect(() => {
@@ -27,30 +27,14 @@ export default function AdminLayout() {
   };
 
   return (
-    <div className="d-flex vh-100 bg-light">
-      {/* Sidebar with fixed width management */}
+    <div className={`admin-layout ${sidebarOpen ? "sidebar-open" : "sidebar-collapsed"}`}>
       <Sidebar isOpen={sidebarOpen} onToggle={toggleSidebar} />
 
-      {/* Main content area - FULL SCROLLABLE */}
-      <div 
-        className="flex-grow-1 d-flex flex-column" 
-        style={{ 
-          marginLeft: sidebarOpen ? "280px" : "80px",
-          transition: "margin-left 0.3s ease",
-          backgroundColor: '#f8f9fa',
-          height: '100vh',
-          overflowY: 'auto' // Ei container tai scroll hobe
-        }}
-      >
-        {/* Header - Scroll with page */}
+      <div className="admin-main">
         <AdminHeader />
-        
-        {/* Main Content - Grow and take available space */}
-        <div className="flex-grow-1 p-4">
+        <main className="admin-content">
           <Outlet />
-        </div>
-        
-        {/* Footer - Scroll with page */}
+        </main>
         <AdminFooter />
       </div>
     </div>

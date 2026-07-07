@@ -1,8 +1,6 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
-
-// Base URL সেট করুন
-const API_BASE_URL = "http://127.0.0.1:8000/api";
+import { API_BASE_URL } from "../api/client";
 
 export default function MyServices() {
   const [orders, setOrders] = useState([]);
@@ -107,7 +105,7 @@ export default function MyServices() {
                       {order.status ? order.status.replace('_', ' ') : 'pending'}
                     </span>
                   </td>
-                  <td>৳{order.service?.price || order.total_price || "N/A"}</td>
+                  <td>BDT {order.service?.price || order.total_price || "N/A"}</td>
                 </tr>
               ))}
             </tbody>

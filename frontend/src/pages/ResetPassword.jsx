@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { resetPassword } from "../api/client";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { FaEye, FaEyeSlash, FaLock, FaSignInAlt } from "react-icons/fa";
 
 export default function ResetPassword() {
   const [searchParams] = useSearchParams();
@@ -12,6 +13,8 @@ export default function ResetPassword() {
   const [message, setMessage] = useState("");
   const [isError, setIsError] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const token = searchParams.get('token');
   const email = searchParams.get('email');
@@ -75,119 +78,105 @@ export default function ResetPassword() {
 
   if (!token || !email) {
     return (
-      <div className="min-vh-100 d-flex align-items-center justify-content-center bg-light">
-        <div className="container text-center">
-          <div className="alert alert-danger">
+      <section className="auth-card">
+          <div className="auth-alert is-error">
             <h4>Invalid Reset Link</h4>
             <p>The password reset link is invalid or has expired.</p>
-            <a href="/forgot-password" className="btn btn-primary">
+            <Link to="/forgot-password" className="auth-inline-link">
               Request New Link
-            </a>
+            </Link>
           </div>
-        </div>
-      </div>
+      </section>
     );
   }
 
   return (
-    <div className="min-vh-100 d-flex align-items-center justify-content-center bg-light">
-      <div className="container-fluid">
-        <div className="row justify-content-center">
-          <div className="col-xl-4 col-lg-4 col-md-5 col-sm-8">
-            <div className="card border-0 shadow-lg rounded-4">
-              <div className="card-body p-5">
-                <div className="text-center mb-4">
-                  <h2 className="fw-bold text-dark">Reset Password</h2>
-                  <p className="text-muted mt-2">
+    <section className="auth-card">
+      <div className="auth-card-heading">
+        <h2>Reset Password</h2>
+        <p className="auth-card-subtitle">
                     Enter your new password
-                  </p>
-                </div>
+        </p>
+      </div>
 
-                {/* Message Alert */}
                 {message && (
-                  <div
-                    className={`alert mb-4 rounded-2 ${
-                      isError ? "alert-danger" : "alert-success"
-                    }`}
-                  >
+        <div className={`auth-alert ${isError ? "is-error" : "is-success"}`}>
                     {message}
                   </div>
                 )}
 
-                <form onSubmit={handleSubmit}>
-                  <div className="mb-3">
+      <form onSubmit={handleSubmit} className="auth-form">
+        <label className="auth-field">
+          <FaLock />
                     <input
                       name="password"
-                      type="password"
-                      className="form-control form-control-lg rounded-2 border-0 bg-light"
+                      type={showPassword ? "text" : "password"}
                       onChange={handleChange}
                       placeholder="New Password"
                       required
                       minLength="8"
                       value={form.password}
-                      style={{ padding: "12px 16px" }}
                     />
-                    <div className="form-text">Password must be at least 8 characters</div>
-                  </div>
-                  <div className="mb-4">
+          <button
+            type="button"
+            className="auth-password-toggle"
+            onClick={() => setShowPassword((value) => !value)}
+            aria-label={showPassword ? "Hide password" : "Show password"}
+          >
+            {showPassword ? <FaEyeSlash /> : <FaEye />}
+          </button>
+        </label>
+        <div className="auth-help-text">Password must be at least 8 characters</div>
+
+        <label className="auth-field">
+          <FaLock />
                     <input
                       name="password_confirmation"
-                      type="password"
-                      className="form-control form-control-lg rounded-2 border-0 bg-light"
+                      type={showConfirmPassword ? "text" : "password"}
                       onChange={handleChange}
                       placeholder="Confirm New Password"
                       required
                       value={form.password_confirmation}
-                      style={{ padding: "12px 16px" }}
                     />
-                  </div>
+          <button
+            type="button"
+            className="auth-password-toggle"
+            onClick={() => setShowConfirmPassword((value) => !value)}
+            aria-label={showConfirmPassword ? "Hide confirm password" : "Show confirm password"}
+          >
+            {showConfirmPassword ? <FaEyeSlash /> : <FaEye />}
+          </button>
+        </label>
+
                   <button
                     type="submit"
-                    className="btn btn-primary btn-lg w-100 rounded-2 fw-semibold py-2"
+          className="auth-submit-btn"
                     disabled={isLoading}
-                    style={{
-                      background: "linear-gradient(45deg, #3b82f6, #1d4ed8)",
-                      border: "none",
-                      fontSize: "1.1rem",
-                    }}
                   >
                     {isLoading ? (
                       <>
-                        <span
-                          className="spinner-border spinner-border-sm me-2"
-                          role="status"
-                        ></span>
+              <span className="auth-spinner" />
                         Resetting...
                       </>
                     ) : (
-                      "Reset Password"
+            <>
+              <FaSignInAlt />
+              Reset Password
+            </>
                     )}
                   </button>
                 </form>
 
-                {/* Back to Login */}
-                <div className="text-center mt-4">
-                  <p className="text-muted mb-0">
-                    <a
-                      href="/login"
-                      className="text-primary fw-semibold text-decoration-none"
-                    >
+      <div className="auth-links">
+        <p>
+                    <Link to="/login">
                       Back to Sign in
-                    </a>
+                    </Link>
                   </p>
                 </div>
-              </div>
-            </div>
-
-            {/* Footer */}
-            <div className="text-center mt-4">
-              <p className="text-muted small">
+      <p className="auth-footer">
                 &copy; {new Date().getFullYear()} MONARK. All rights reserved.
               </p>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+    </section>
   );
 }

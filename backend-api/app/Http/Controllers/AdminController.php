@@ -1109,7 +1109,7 @@ class AdminController extends Controller
 
                 // Send email with PDF ticket (optional - if you have mail setup)
                 try {
-                    Mail::to($booking->user->email)->send(new TicketMail($booking, $ticketNumber));
+                    Mail::to($booking->user->email)->queue(new TicketMail($booking, $ticketNumber));
                     \Log::info('Ticket email sent to: ' . $booking->user->email);
                 } catch (\Exception $emailError) {
                     \Log::error('Email sending failed: ' . $emailError->getMessage());
@@ -1299,7 +1299,7 @@ class AdminController extends Controller
 
             // Send approval email
             try {
-                Mail::to($user->email)->send(new TransactionApprovedMail($transaction, $user));
+                Mail::to($user->email)->queue(new TransactionApprovedMail($transaction, $user));
                 \Log::info("Approval email sent to: {$user->email}");
             } catch (\Exception $emailException) {
                 \Log::error("Failed to send approval email: " . $emailException->getMessage());
@@ -1356,7 +1356,7 @@ class AdminController extends Controller
 
             // Send rejection email
             try {
-                Mail::to($transaction->user->email)->send(new TransactionRejectedMail($transaction, $reason));
+                Mail::to($transaction->user->email)->queue(new TransactionRejectedMail($transaction, $reason));
                 \Log::info("Rejection email sent to: {$transaction->user->email}");
             } catch (\Exception $emailException) {
                 \Log::error("Failed to send rejection email: " . $emailException->getMessage());
@@ -1536,7 +1536,7 @@ public function getServiceOrderStats()
             ]);
 
             // Send confirmation email
-            Mail::to($order->user->email)->send(new BookingConfirmedMail($order, $slipData));
+            Mail::to($order->user->email)->queue(new BookingConfirmedMail($order, $slipData));
 
             // Schedule auto status updates
             $this->scheduleStatusUpdates($order);
@@ -1659,7 +1659,7 @@ private function generateBookingSlip($order)
                 $this->generateInvoice($order);
                 
                 // Send completion email
-                Mail::to($order->user->email)->send(new ServiceCompletedMail($order));
+                Mail::to($order->user->email)->queue(new ServiceCompletedMail($order));
                 
                 Log::info("Auto updated to completed", ['order_id' => $order->id]);
             }
@@ -1725,14 +1725,14 @@ private function generateBookingSlip($order)
             // If confirming, send email and generate slip
             if ($request->status === 'confirmed' && $oldStatus === 'pending') {
                 $slipData = $this->generateBookingSlip($order);
-                Mail::to($order->user->email)->send(new BookingConfirmedMail($order, $slipData));
+                Mail::to($order->user->email)->queue(new BookingConfirmedMail($order, $slipData));
                 $this->scheduleStatusUpdates($order);
             }
 
             // If completing, generate invoice
             if ($request->status === 'completed' && $oldStatus === 'in_progress') {
                 $this->generateInvoice($order);
-                Mail::to($order->user->email)->send(new ServiceCompletedMail($order));
+                Mail::to($order->user->email)->queue(new ServiceCompletedMail($order));
             }
 
             return response()->json([

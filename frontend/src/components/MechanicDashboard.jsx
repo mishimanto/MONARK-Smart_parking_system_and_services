@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from "react";
+import React, { useCallback, useState, useEffect } from "react";
 import axios from "axios";
 import Spinner from "../components/Spinner";
 import Swal from 'sweetalert2';
+import { API_BASE_URL } from "../api/client";
 
 const MechanicDashboard = () => {
   const [orders, setOrders] = useState([]);
@@ -10,14 +11,7 @@ const MechanicDashboard = () => {
   const [statusFilter, setStatusFilter] = useState("");
   const [loadingButtons, setLoadingButtons] = useState({});
 
-  const API_BASE_URL = "http://127.0.0.1:8000/api";
-
-  useEffect(() => {
-    fetchOrders();
-    fetchStats();
-  }, [statusFilter]);
-
-  const fetchOrders = async () => {
+  const fetchOrders = useCallback(async () => {
     try {
       setLoading(true);
       const token = localStorage.getItem("token");
@@ -50,9 +44,9 @@ const MechanicDashboard = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [statusFilter]);
 
-  const fetchStats = async () => {
+  const fetchStats = useCallback(async () => {
     try {
       const token = localStorage.getItem("token");
       const response = await axios.get(`${API_BASE_URL}/mechanic/dashboard-stats`, {
@@ -82,7 +76,12 @@ const MechanicDashboard = () => {
         total_assigned: orders.length
       });
     }
-  };
+  }, [orders]);
+
+  useEffect(() => {
+    fetchOrders();
+    fetchStats();
+  }, [fetchOrders, fetchStats]);
 
   const startService = async (orderId) => {
     const result = await Swal.fire({
@@ -123,7 +122,7 @@ const MechanicDashboard = () => {
         fetchOrders();
         fetchStats();
       }
-    } catch (error) {
+    } catch {
       Swal.fire({
         icon: 'error',
         title: 'Failed to start service',
@@ -261,7 +260,7 @@ const MechanicDashboard = () => {
   };
 
   const formatPrice = (price) => {
-    return `৳${parseFloat(price).toFixed(2)}`;
+    return `BDT ${parseFloat(price).toFixed(2)}`;
   };
 
   const getStatusBadge = (status) => {

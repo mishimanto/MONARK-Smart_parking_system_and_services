@@ -58,22 +58,6 @@ export default function VerifyTransaction() {
         }
     };
 
-    // Test function - সরাসরি database check করার জন্য
-    const testDirectVerification = async () => {
-        const testData = {
-            transaction_id: 'TXN202510052223527afvuw', // generated_transaction_id
-            verification_code: 'DW9TQU'
-        };
-
-        try {
-            console.log('🧪 Testing with direct data:', testData);
-            const response = await api.post('/verify-transaction', testData);
-            console.log('🧪 Test response:', response.data);
-        } catch (error) {
-            console.error('🧪 Test error:', error.response);
-        }
-    };
-
     if (!transactionInfo) {
         return (
             <div className="container py-4">
@@ -135,7 +119,7 @@ export default function VerifyTransaction() {
                                         <strong>Amount:</strong>
                                     </div>
                                     <div className="col-7">
-                                        ৳ {transactionInfo.amount}
+                                        BDT {transactionInfo.amount}
                                     </div>
                                 </div>
                                 <div className="row mt-2">

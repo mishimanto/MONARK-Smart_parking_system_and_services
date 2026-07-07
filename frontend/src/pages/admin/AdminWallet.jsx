@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import axios from "axios";
+import { API_BASE_URL } from "../../api/client";
 
 export default function AdminWallet() {
   const [transactions, setTransactions] = useState([]);
@@ -46,12 +47,12 @@ export default function AdminWallet() {
     }
   `;
 
-  const fetchTransactions = async (p = 1, type = "") => {
+  const fetchTransactions = useCallback(async (p = 1, type = "") => {
     setLoading(true);
     try {
       const token = localStorage.getItem('token');
       
-      let apiUrl = `http://127.0.0.1:8000/api/admin/wallet-transactions`;
+      let apiUrl = `${API_BASE_URL}/admin/wallet-transactions`;
       
       const params = { 
         page: p, 
@@ -87,7 +88,7 @@ export default function AdminWallet() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [filterStatus, filterType, perPage, q]);
 
   useEffect(() => {
     let type = "";
@@ -95,7 +96,7 @@ export default function AdminWallet() {
       type = activeTab;
     }
     fetchTransactions(page, type);
-  }, [page, activeTab, filterType, filterStatus]);
+  }, [activeTab, fetchTransactions, page]);
 
   const handleSearch = (e) => {
     e.preventDefault();
@@ -133,7 +134,7 @@ export default function AdminWallet() {
         type = activeTab;
       }
 
-      const res = await axios.get(`http://127.0.0.1:8000/api/admin/wallet-transactions/export`, {
+      const res = await axios.get(`${API_BASE_URL}/admin/wallet-transactions/export`, {
         params: {
           q: q || undefined,
           type: type || filterType || undefined,

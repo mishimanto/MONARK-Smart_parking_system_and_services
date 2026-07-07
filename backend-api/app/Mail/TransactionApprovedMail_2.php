@@ -6,7 +6,7 @@ use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
 use Illuminate\Queue\SerializesModels;
 
-class TransactionApprovedMail extends Mailable
+class TransactionApprovedMail_2 extends Mailable
 {
     use Queueable, SerializesModels;
 

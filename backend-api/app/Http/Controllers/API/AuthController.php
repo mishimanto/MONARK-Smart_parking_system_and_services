@@ -26,13 +26,12 @@ class AuthController extends Controller
             'email' => $request->email,
             'password' => Hash::make($request->password),
             'role' => 'user',
+            'email_verified_at' => now(),
         ]);
-
-        $user->sendEmailVerificationNotification();
 
         return response()->json([
             'status' => 'success',
-            'message' => 'User registered successfully. Please check your email to verify your account.',
+            'message' => 'User registered successfully. You can now login.',
             'user' => $user
         ], 201);
     }
@@ -54,15 +53,6 @@ class AuthController extends Controller
             ], 401);
         }
 
-        // ✅ Email verification check
-        if (! $user->hasVerifiedEmail()) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Please verify your email before login.'
-            ], 403);
-        }
-
-        // ✅ Generate token
         $token = $user->createToken('auth_token')->plainTextToken;
 
         return response()->json([
@@ -70,7 +60,7 @@ class AuthController extends Controller
             'message' => 'User logged in successfully',
             'access_token' => $token,
             'token_type' => 'Bearer',
-            'user' => $user, // ✅ add user object to response
+            'user' => $user,
         ]);
     }
 
@@ -123,8 +113,8 @@ class AuthController extends Controller
                 'remember_token' => $token
             ])->save();
 
-            // For testing - return token directly
-            $resetUrl = "http://localhost:3000/reset-password?token={$token}&email=" . urlencode($request->email);
+            $frontendUrl = rtrim(config('app.frontend_url', env('FRONTEND_URL', 'http://localhost:5173')), '/');
+            $resetUrl = "{$frontendUrl}/reset-password?token={$token}&email=" . urlencode($request->email);
 
             return response()->json([
                 'success' => true,

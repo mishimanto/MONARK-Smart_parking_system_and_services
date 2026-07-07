@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Controllers\Api; // Api নেমস্পেসে নিন
+namespace App\Http\Controllers\API;
 
 use App\Http\Controllers\Controller;
 use App\Models\AboutPage;

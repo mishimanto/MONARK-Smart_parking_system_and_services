@@ -1,11 +1,12 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { 
   getAdminServices, 
   createService, 
   updateService, 
   deleteService, 
   toggleServiceStatus,
-  uploadServiceImage
+  uploadServiceImage,
+  APP_BASE_URL
 } from '../../api/client';
 import Swal from 'sweetalert2';
 
@@ -33,9 +34,9 @@ export default function AdminServices() {
     image: ""
   });
 
-  const BASE_URL = "http://127.0.0.1:8000/";
+  const BASE_URL = `${APP_BASE_URL}/`;
   // Fetch services with pagination
-  const fetchServices = async (page = currentPage) => {
+  const fetchServices = useCallback(async (page = currentPage) => {
     setLoading(true);
     try {
       const response = await getAdminServices(page, perPage);
@@ -69,7 +70,7 @@ export default function AdminServices() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [currentPage, perPage]);
 
   // Handle image upload
   const handleImageUpload = async (file) => {
@@ -350,7 +351,7 @@ export default function AdminServices() {
 
   useEffect(() => {
     fetchServices();
-  }, []);
+  }, [fetchServices]);
 
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('en-BD', {

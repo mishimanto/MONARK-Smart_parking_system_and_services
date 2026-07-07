@@ -1,64 +1,97 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import ReactDOM from "react-dom";
-import { 
-  FaCar, 
-  FaStar, 
-  FaCheckCircle, 
-  FaClock, 
-  FaMapMarkerAlt, 
-  FaChevronLeft, 
-  FaChevronRight,
-  FaShieldAlt,
-  FaQrcode,
-  FaBolt,
-  FaChartLine,
-  FaUsers,
-  FaParking
-} from "react-icons/fa";
+import {
+  RiArrowLeftSLine,
+  RiArrowRightSLine,
+  RiBarChartBoxLine,
+  RiCarLine,
+  RiCheckboxCircleLine,
+  RiCustomerService2Line,
+  RiFlashlightLine,
+  RiMapPin2Line,
+  RiParkingBoxLine,
+  RiQrCodeLine,
+  RiShieldCheckLine,
+  RiStarSFill,
+  RiTimeLine,
+  RiUserStarLine,
+} from "react-icons/ri";
+import { FaDirections } from "react-icons/fa";
+import { APP_BASE_URL } from "../api/client";
 import "./Home.css";
 
-const BASE_URL = "http://127.0.0.1:8000";
+const BASE_URL = APP_BASE_URL;
+const PARKING_FALLBACKS = ["/images/parking-lot1.jpg", "/images/parking-lot2.jpg", "/images/parking-lot3.jpg"];
+const SERVICE_FALLBACKS = ["/images/parking-hero-3.jpg", "/images/parking-hero-2.jpg", "/images/parking-hero.png"];
+
+const getFallbackImage = (type, index = 0) => {
+    const images = type === "service" ? SERVICE_FALLBACKS : PARKING_FALLBACKS;
+    return images[index % images.length];
+};
+
+const getImageUrl = (image, type = "parking", index = 0) => {
+    if (!image || image === "null" || image === "undefined") {
+        return getFallbackImage(type, index);
+    }
+
+    const trimmedImage = String(image).trim();
+
+    if (/^https?:\/\//i.test(trimmedImage)) {
+        return trimmedImage;
+    }
+
+    if (trimmedImage.startsWith("/images/")) {
+        return trimmedImage;
+    }
+
+    const imagePath = trimmedImage.replace(/^\/+/, "");
+    return `${BASE_URL}/${imagePath}`;
+};
+
+const handleImageError = (event, type, index = 0) => {
+    const fallback = getFallbackImage(type, index);
+    if (event.currentTarget.src.endsWith(fallback)) return;
+    event.currentTarget.src = fallback;
+};
+
+const heroImages = [
+    {
+        id: 1,
+        image: '/images/parking-hero.png',
+        title: 'Smart Parking Solutions',
+        bedge: 'PREMIUM PARKING SOLUTION',
+        subtitle: 'Find and book premium parking spots in seconds',
+        cta: 'Explore Locations',
+        link: '/all-parkings'
+    },
+    {
+        id: 2,
+        image: '/images/parking-hero-2.jpg',
+        title: '24/7 Secure Parking',
+        bedge: 'PREMIUM PARKING SOLUTION',
+        subtitle: 'Your vehicle is safe with our advanced security systems',
+        cta: 'Explore Locations',
+        link: '/all-parkings'
+    },
+    {
+        id: 3,
+        image: '/images/parking-hero-3.jpg',
+        title: 'Premium Car Services',
+        bedge: 'PREMIUM SERVICES',
+        subtitle: 'Professional cleaning and maintenance for your vehicle',
+        cta: 'View Services',
+        link: '/services'
+    }
+];
 
 export default function LandingPage() {
-    const [isLoggedIn, setIsLoggedIn] = useState(false);
     const [parkingSpots, setParkingSpots] = useState([]);
     const [services, setServices] = useState([]);
     const [loading, setLoading] = useState(true);
     const [currentSlide, setCurrentSlide] = useState(0);
-    const [showModal, setShowModal] = useState(false); // ✅ Added missing state
+    const [showModal, setShowModal] = useState(false);
     const navigate = useNavigate();
-
-    // Hero Carousel Images
-    const heroImages = [
-        {
-            id: 1,
-            image: '/images/parking-hero.png',
-            title: 'Smart Parking Solutions',
-            bedge: 'PREMIUM PARKING SOLUTION',
-            subtitle: 'Find and book premium parking spots in seconds',
-            cta: 'Explore',
-            link: '/all-parkings'
-        },
-        {
-            id: 2,
-            image: '/images/parking-hero-2.jpg',
-            title: '24/7 Secure Parking',
-            bedge: 'PREMIUM PARKING SOLUTION',
-            subtitle: 'Your vehicle is safe with our advanced security systems',
-            cta: 'Explore Locations',
-            link: '/all-parkings'
-        },
-        {
-            id: 3,
-            image: '/images/parking-hero-3.jpg',
-            title: 'Premium Car Services',
-            bedge: 'PREMIUM SERVICES',
-            subtitle: 'Professional cleaning and maintenance for your vehicle',
-            cta: 'View Services',
-            link: '/services'
-        }
-    ];
 
     // Escape key handler for modal
     useEffect(() => {
@@ -74,24 +107,7 @@ export default function LandingPage() {
     
 
 
-    // Get full image URL
-    const getImageUrl = (image) => {
-        if (!image || image === 'null') {
-            return '/images/default-parking.jpg';
-        }
-        
-        if (image.startsWith('http')) {
-            return image;
-        }
-        
-        const imagePath = image.startsWith('/') ? image.substring(1) : image;
-        return `${BASE_URL}/${imagePath}`;
-    };
-
     useEffect(() => {
-        const token = localStorage.getItem("token");
-        setIsLoggedIn(!!token);
-
         // Auto slide for hero carousel
         const slideInterval = setInterval(() => {
             setCurrentSlide((prev) => (prev + 1) % heroImages.length);
@@ -102,9 +118,9 @@ export default function LandingPage() {
             .then(res => res.json())
             .then(data => {
                 const processedParkings = Array.isArray(data) ? data : (data.data || []);
-                const processedWithUrls = processedParkings.map(parking => ({
+                const processedWithUrls = processedParkings.map((parking, index) => ({
                     ...parking,
-                    image: getImageUrl(parking.image)
+                    image: getImageUrl(parking.image, "parking", index)
                 }));
                 const latestParkings = processedWithUrls.slice(0, 3);
                 setParkingSpots(latestParkings);
@@ -116,9 +132,9 @@ export default function LandingPage() {
             .then(res => res.json())
             .then(data => {
                 const servicesData = Array.isArray(data) ? data : (data.data || []);
-                const processedServices = servicesData.map(service => ({
+                const processedServices = servicesData.map((service, index) => ({
                     ...service,
-                    image: getImageUrl(service.image)
+                    image: getImageUrl(service.image, "service", index)
                 }));
                 const featuredServices = processedServices.slice(0, 3);
                 setServices(featuredServices);
@@ -132,14 +148,6 @@ export default function LandingPage() {
         return () => clearInterval(slideInterval);
     }, []);
 
-    const nextSlide = () => {
-        setCurrentSlide((prev) => (prev + 1) % heroImages.length);
-    };
-
-    const prevSlide = () => {
-        setCurrentSlide((prev) => (prev - 1 + heroImages.length) % heroImages.length);
-    };
-
     const goToSlide = (index) => {
         setCurrentSlide(index);
     };
@@ -148,7 +156,7 @@ export default function LandingPage() {
         navigate(`/parking/${spotId}`);
     };
 
-    const handleServiceClick = (serviceId) => {
+    const handleServiceClick = () => {
         navigate(`/services`);
     };
 
@@ -159,31 +167,6 @@ export default function LandingPage() {
     const handleViewAllParkings = () => {
         navigate("/all-parkings");
     };
-
-    // Function to parse description and extract features
-    const parseParkingFeatures = (description) => {
-        if (!description) return [];
-        return description.split('•').map(item => item.trim()).filter(item => item);
-    };
-
-    // Modal handlers with useCallback
-    const handleParkingsClick = useCallback(() => {
-        navigate("/all-parkings");
-        setShowModal(false);
-    }, [navigate]);
-
-    const handleServicesClick = useCallback(() => {
-        navigate("/all-services");
-        setShowModal(false);
-    }, [navigate]);
-
-    const handleCloseModal = useCallback(() => {
-        setShowModal(false);
-    }, []);
-
-    const handleOpenModal = useCallback(() => {
-        setShowModal(true);
-    }, []);
 
     return (
         <div className="landing-home-page">
@@ -200,17 +183,13 @@ export default function LandingPage() {
                             <div className="home-hero-content">
                                 <div className="container">
                                     <div className="row justify-content-center text-center">
-                                        <div className="col-lg-12 col-md-12">
-                                            <div className="home-hero-badge">{slide.bedge}</div>
+                                        <div className="col-lg-12 col-md-12">                                            
                                             <h1 className="home-hero-title">
                                                 {slide.title}
-                                            </h1>
-                                            <p className="home-hero-subtitle">
-                                                {slide.subtitle}
-                                            </p>
+                                            </h1>                                            
                                             <div className="home-hero-cta">
                                                 <button
-                                                    className="btn home-btn-neon-primary btn-lg"
+                                                    className="home-btn-neon-primary"
                                                     onClick={() => navigate(slide.link)}
                                                 >
                                                     {slide.cta}
@@ -222,15 +201,8 @@ export default function LandingPage() {
                             </div>
                         </div>
                     ))}
-                </div>
-
-                {/* Carousel Controls */}
-                <button className="home-carousel-control prev" onClick={prevSlide}>
-                    <FaChevronLeft />
-                </button>
-                <button className="home-carousel-control next" onClick={nextSlide}>
-                    <FaChevronRight />
-                </button>
+                </div>          
+                
 
                 {/* Carousel Indicators */}
                 <div className="home-carousel-indicators">
@@ -267,38 +239,36 @@ export default function LandingPage() {
             {/* Features Grid Section */}
             <section className="home-features-section">
                 <div className="container">
-                    <div className="home-section-header text-center mb-5">
-                        <span className="home-section-badge">WHY CHOOSE US</span>
-                    </div>
+                    
                     <div className="row g-4">
                         {[
                             {
-                                icon: <FaBolt />,
+                                icon: <RiFlashlightLine />,
                                 title: 'Instant Booking',
                                 desc: 'Real-time availability and instant confirmation'
                             },
                             {
-                                icon: <FaShieldAlt />,
+                                icon: <RiShieldCheckLine />,
                                 title: 'Military Grade Security',
                                 desc: '24/7 surveillance and advanced security systems'
                             },
                             {
-                                icon: <FaQrcode />,
+                                icon: <RiQrCodeLine />,
                                 title: 'Digital Access',
                                 desc: 'Seamless entry and exit with QR technology'
                             },
                             {
-                                icon: <FaChartLine />,
+                                icon: <RiBarChartBoxLine />,
                                 title: 'Smart Analytics',
                                 desc: 'AI-powered insights and occupancy tracking'
                             },
                             {
-                                icon: <FaUsers />,
+                                icon: <RiCustomerService2Line />,
                                 title: 'Premium Support',
                                 desc: 'Dedicated customer service team'
                             },
                             {
-                                icon: <FaParking />,
+                                icon: <RiParkingBoxLine />,
                                 title: 'Valet Service',
                                 desc: 'Professional valet parking available'
                             }
@@ -309,6 +279,7 @@ export default function LandingPage() {
                                         {feature.icon}
                                     </div>
                                     <h5>{feature.title}</h5>
+                                    <p>{feature.desc}</p>
                                 </div>
                             </div>
                         ))}
@@ -319,13 +290,12 @@ export default function LandingPage() {
             {/* Latest Parking Spots Section */}
             <section className="home-parking-section">
                 <div className="container-fluid px-5">
-                    <div className="home-section-header text-center mb-5">
-                        <span className="home-section-badge">PARKING LOCATIONS</span>
+                    <div className="home-section-header text-center mb-5">                        
+                        <h2 className="home-section-title">Premium Parking Near You</h2>                        
                     </div>
                     
                     <div className="row g-4">
                         {parkingSpots.map((spot) => {
-                            const features = parseParkingFeatures(spot.description);
                             return (
                                 <div key={spot.id} className="col-lg-4 col-md-6 p-4">
                                     <div 
@@ -337,10 +307,10 @@ export default function LandingPage() {
                                                 src={spot.image} 
                                                 className="home-card-img" 
                                                 alt={spot.name}
-                                                onError={(e) => {
-                                                    e.target.src = '/images/default-parking.jpg';
-                                                }}
+                                                loading="lazy"
+                                                onError={(event) => handleImageError(event, "parking", spot.id)}
                                             />
+                                            <div className="home-card-image-shade"></div>
                                             <div className="home-card-badge">
                                                 <span className={`home-availability-badge ${spot.available_slots > 0 ? 'available' : 'full'}`}>
                                                     {spot.available_slots > 0 ? 
@@ -350,35 +320,26 @@ export default function LandingPage() {
                                                 </span>
                                             </div>
                                             <div className="home-distance-badge">
-                                                <FaMapMarkerAlt className="me-1" />
+                                                <FaDirections className="me-1" />
                                                 {spot.distance || 'Premium Location'}
                                             </div>
                                         </div>
                                         <div className="home-card-body">
-                                            <div className="d-flex justify-content-between align-items-start mb-3">
+                                            <div className="d-flex justify-content-between align-items-center mb-3">
                                                 <h5 className="home-card-title mb-0">{spot.name}</h5>
                                                 <div className="home-rating">
-                                                    <FaStar className="home-rating-star" />
+                                                    <RiStarSFill className="home-rating-star" />
                                                     <span className="ms-1">4.8</span>
                                                 </div>
-                                            </div>
+                                            </div>                
                                             
-                                            <div className="home-features-list mb-3">
-                                                {features.map((feature, index) => (
-                                                    <div key={index} className="home-feature-item">
-                                                        <FaCheckCircle className="me-2" />
-                                                        <span>{feature}</span>
-                                                    </div>
-                                                ))}
-                                            </div>
-
                                             <div className="home-card-meta">
                                                 <div className="home-meta-item">
-                                                    <FaCar className="me-2" />
-                                                    <span>{spot.total_slots} Total Slots</span>
+                                                    <RiCarLine className="me-2" />
+                                                    <span>{spot.total_slots} Slots</span>
                                                 </div>
                                                 <div className="home-meta-item">
-                                                    <FaClock className="me-2" />
+                                                    <RiTimeLine className="me-2" />
                                                     <span>24/7 Access</span>
                                                 </div>
                                             </div>
@@ -386,11 +347,10 @@ export default function LandingPage() {
                                             <div className="home-card-footer">
                                                 <div className="d-flex justify-content-between align-items-center">
                                                     <div className="home-price-info">
-                                                        <div className="home-price-amount">৳ {spot.price_per_hour}/hr</div>
-                                                        <div className="home-price-note">All inclusive</div>
+                                                        <div className="home-price-amount">BDT {spot.price_per_hour}/hr</div>                                                        
                                                     </div>
                                                     <button 
-                                                        className={`btn ${spot.available_slots > 0 ? 'home-btn-neon-primary' : 'home-btn-neon-secondary'}`}
+                                                        className={`${spot.available_slots > 0 ? 'home-btn-neon-primary' : 'home-btn-neon-secondary'}`}
                                                         disabled={spot.available_slots === 0}
                                                     >
                                                         {spot.available_slots > 0 ? 'Book Now' : 'Fully Booked'}
@@ -407,19 +367,19 @@ export default function LandingPage() {
                     {parkingSpots.length === 0 && !loading && (
                         <div className="text-center py-5">
                             <div className="home-empty-state">
-                                <FaCar className="home-empty-icon mb-3" />
+                                <RiCarLine className="home-empty-icon mb-3" />
                                 <h4>No Parking Spots Available</h4>
                                 <p>Premium locations coming soon</p>
                             </div>
                         </div>
                     )}
 
-                    <div className="text-center mt-5">
+                    <div className="text-center">
                         <button 
-                            className="btn home-btn-neon-outline btn-lg px-5"
+                            className="home-btn-neon-outline px-5"
                             onClick={handleViewAllParkings}
                         >
-                            <FaMapMarkerAlt className="me-2" />
+                            <RiMapPin2Line className="me-2" />
                             Explore All Locations
                         </button>
                     </div>
@@ -429,8 +389,9 @@ export default function LandingPage() {
             {/* Services Section */}
             <section className="home-services-section">
                 <div className="container-fluid px-5">
-                    <div className="home-section-header text-center mb-5">
-                        <span className="home-section-badge">PREMIUM SERVICES</span>
+                    <div className="home-section-header text-center mb-5">                        
+                        <h2 className="home-section-title">Car Care Services</h2>
+                        
                     </div>
 
                     {loading ? (
@@ -454,13 +415,13 @@ export default function LandingPage() {
                                                     src={service.image} 
                                                     alt={service.name}
                                                     className="home-service-img"
-                                                    onError={(e) => {
-                                                        e.target.src = '/images/default-service.jpg';
-                                                    }}
+                                                    loading="lazy"
+                                                    onError={(event) => handleImageError(event, "service", service.id)}
                                                 />
+                                                <div className="home-card-image-shade"></div>
                                                 <div className="home-service-overlay">
                                                     <span className="home-service-price">
-                                                        ৳ {service.price}
+                                                        BDT {service.price}
                                                     </span>
                                                 </div>
                                             </div>
@@ -471,16 +432,16 @@ export default function LandingPage() {
                                                 </p>
                                                 <div className="home-service-meta">
                                                     <div className="home-service-duration">
-                                                        <FaClock className="me-2" />
-                                                        <span>{service.duration}</span>
+                                                        <RiTimeLine className="me-2" />
+                                                        <span>{service.duration || "Flexible timing"}</span>
                                                     </div>
                                                     <div className="home-service-rating">
-                                                        <FaStar className="me-1" />
+                                                        <RiStarSFill className="me-1" />
                                                         <span>4.5</span>
                                                     </div>
                                                 </div>
                                                 <div className="home-service-footer">
-                                                    <button className="btn home-btn-neon-primary w-100">
+                                                    <button className="home-btn-neon-primary">
                                                         Book This Service
                                                     </button>
                                                 </div>
@@ -493,19 +454,19 @@ export default function LandingPage() {
                             {services.length === 0 && !loading && (
                                 <div className="text-center py-5">
                                     <div className="home-empty-state">
-                                        <FaCar className="home-empty-icon mb-3" />
+                                        <RiCarLine className="home-empty-icon mb-3" />
                                         <h4>Premium Services Coming Soon</h4>
                                         <p>Elite car care services launching soon</p>
                                     </div>
                                 </div>
                             )}
 
-                            <div className="text-center mt-5">
+                            <div className="text-center">
                                 <button 
-                                    className="btn home-btn-neon-outline btn-lg px-5"
+                                    className="home-btn-neon-outline px-5"
                                     onClick={handleViewAllServices}
                                 >
-                                    <FaCar className="me-2" />
+                                    <RiCarLine className="me-2" />
                                     View All Services
                                 </button>
                             </div>
@@ -519,10 +480,10 @@ export default function LandingPage() {
                 <div className="container">
                     <div className="row text-center">
                         {[
-                            { number: '1000+', label: 'Premium Bookings', icon: <FaCar /> },
-                            { number: '50+', label: 'Elite Locations', icon: <FaMapMarkerAlt /> },
-                            { number: '50,000+', label: 'Satisfied Clients', icon: <FaUsers /> },
-                            { number: '24/7', label: 'Concierge Support', icon: <FaClock /> }
+                            { number: '1000+', label: 'Premium Bookings', icon: <RiCarLine /> },
+                            { number: '50+', label: 'Elite Locations', icon: <RiMapPin2Line /> },
+                            { number: '50,000+', label: 'Satisfied Clients', icon: <RiUserStarLine /> },
+                            { number: '24/7', label: 'Concierge Support', icon: <RiTimeLine /> }
                         ].map((stat, index) => (
                             <div key={index} className="col-lg-3 col-md-6 mb-4">
                                 <div className="home-stat-box">
@@ -545,13 +506,11 @@ export default function LandingPage() {
                         <div className="row align-items-center">
                             <div className="col-lg-8">
                                 <h2 className="home-cta-title">Ready for Elite Parking Experience?</h2>
-                                <p className="home-cta-subtitle">
-                                    Join thousands of premium users and experience the future of parking
-                                </p>
+                                
                                 <div className="home-cta-features">
                                     {['No Hidden Charges', 'Instant Confirmation', 'Premium Support', 'Secure Payments'].map((feature, index) => (
                                         <span key={index} className="home-cta-feature-item">
-                                            <FaCheckCircle className="me-2" />
+                                            <RiCheckboxCircleLine className="me-2" />
                                             {feature}
                                         </span>
                                     ))}
@@ -559,7 +518,7 @@ export default function LandingPage() {
                             </div>
                             <div className="col-lg-4 text-lg-end">
                                 <button 
-                                    className="btn home-btn-neon-primary btn-lg px-5"
+                                    className="home-btn-neon-primary px-5"
                                     onClick={() => setShowModal(true)}
                                 >
                                     Get Started Today
@@ -575,13 +534,13 @@ export default function LandingPage() {
                                                     <div className="row text-center">
                                                         <div className="col-6">
                                                             <div className="home-feature-badge text-light">
-                                                                <FaCheckCircle className="text-success me-2" />
+                                                                <RiCheckboxCircleLine className="text-success me-2" />
                                                                 No Hidden Charges
                                                             </div>
                                                         </div>
                                                         <div className="col-6">
                                                             <div className="home-feature-badge text-light">
-                                                                <FaCheckCircle className="text-success me-2" />
+                                                                <RiCheckboxCircleLine className="text-success me-2" />
                                                                 Instant Confirmation
                                                             </div>
                                                         </div>
@@ -598,14 +557,14 @@ export default function LandingPage() {
                                                             }}
                                                         >
                                                             <div className="home-option-icon parking">
-                                                                <FaParking />
+                                                                <RiParkingBoxLine />
                                                             </div>
                                                             <h5>Find Parking</h5>
                                                             
                                                             <div className="home-option-features mx-5 p-3">
-                                                                <span><FaCheckCircle /> Real-time availability</span>
-                                                                <span><FaCheckCircle /> Secure locations</span>
-                                                                <span><FaCheckCircle /> Instant booking</span>
+                                                                <span><RiCheckboxCircleLine /> Real-time availability</span>
+                                                                <span><RiCheckboxCircleLine /> Secure locations</span>
+                                                                <span><RiCheckboxCircleLine /> Instant booking</span>
                                                             </div>
                                                         </div>
                                                     </div>
@@ -614,18 +573,18 @@ export default function LandingPage() {
                                                         <div 
                                                             className="home-modal-option-card"
                                                             onClick={() => {
-                                                                navigate("/all-services");
+                                                                navigate("/services");
                                                                 setShowModal(false);
                                                             }}
                                                         >
                                                             <div className="home-option-icon service">
-                                                                <FaCar />
+                                                                <RiCarLine />
                                                             </div>
                                                             <h5>Car Services</h5>
                                                             <div className="home-option-features mx-5 p-3">
-                                                                <span><FaCheckCircle /> Professional service</span>
-                                                                <span><FaCheckCircle /> Quality guaranteed</span>
-                                                                <span><FaCheckCircle /> Quick delivery</span>
+                                                                <span><RiCheckboxCircleLine /> Professional service</span>
+                                                                <span><RiCheckboxCircleLine /> Quality guaranteed</span>
+                                                                <span><RiCheckboxCircleLine /> Quick delivery</span>
                                                             </div>
                                                         </div>
                                                     </div>

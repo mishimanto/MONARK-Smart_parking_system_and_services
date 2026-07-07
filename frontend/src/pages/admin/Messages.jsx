@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
+import { API_BASE_URL } from "../../api/client";
 
 export default function Messages() {
   const [messages, setMessages] = useState([]);
@@ -24,7 +25,7 @@ export default function Messages() {
         headers['Authorization'] = `Bearer ${token}`;
       }
 
-      const response = await fetch("http://127.0.0.1:8000/api/messages", {
+      const response = await fetch(`${API_BASE_URL}/messages`, {
         method: 'GET',
         headers: headers,
       });
@@ -71,7 +72,7 @@ export default function Messages() {
         headers['Authorization'] = `Bearer ${token}`;
       }
 
-      const response = await fetch(`http://127.0.0.1:8000/api/messages/${messageId}/read`, {
+      const response = await fetch(`${API_BASE_URL}/messages/${messageId}/read`, {
         method: 'PUT',
         headers: headers,
       });
@@ -93,41 +94,6 @@ export default function Messages() {
     }
   };
 
-  // Mark message as replied
-  const markAsReplied = async (messageId) => {
-    try {
-      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-      const headers = {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      };
-
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
-
-      const response = await fetch(`http://127.0.0.1:8000/api/messages/${messageId}/replied`, {
-        method: 'PUT',
-        headers: headers,
-      });
-
-      if (response.ok) {
-        // Update messages list
-        const updatedMessages = messages.map(msg => 
-          msg.id === messageId ? { ...msg, status: 'replied' } : msg
-        );
-        setMessages(updatedMessages);
-        
-        // Update selected message if it's the same
-        if (selectedMessage?.id === messageId) {
-          setSelectedMessage(prev => ({ ...prev, status: 'replied' }));
-        }
-      }
-    } catch (err) {
-      console.error('Error marking message as replied:', err);
-    }
-  };
-
   // Delete message
   const deleteMessage = async (messageId) => {
     if (!window.confirm('Are you sure you want to delete this message?')) {
@@ -145,7 +111,7 @@ export default function Messages() {
         headers['Authorization'] = `Bearer ${token}`;
       }
 
-      const response = await fetch(`http://127.0.0.1:8000/api/messages/${messageId}`, {
+      const response = await fetch(`${API_BASE_URL}/messages/${messageId}`, {
         method: 'DELETE',
         headers: headers,
       });
@@ -179,22 +145,6 @@ export default function Messages() {
     if (message.status === 'unread') {
       markAsRead(message.id);
     }
-  };
-
-  const handleEmailReply = (message) => {
-    const subject = `Re: ${message.subject || 'Your Message'}`;
-    const body = `Dear ${message.name},\n\nThank you for contacting Smart Parking System. We have received your message and will respond to you shortly.\n\nBest regards,\nSmart Parking Team\nCustomer Support\n\n--- Original Message ---\nFrom: ${message.name}\nEmail: ${message.email}\nDate: ${new Date(message.created_at).toLocaleString()}\nSubject: ${message.subject || 'No Subject'}\n\nMessage:\n${message.message}`;
-    
-    // Create mailto link
-    const mailtoLink = `mailto:${message.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-    
-    // Open email client
-    window.location.href = mailtoLink;
-    
-    // Mark as replied after email attempt
-    setTimeout(() => {
-      markAsReplied(message.id);
-    }, 1000);
   };
 
   const closeModal = () => {

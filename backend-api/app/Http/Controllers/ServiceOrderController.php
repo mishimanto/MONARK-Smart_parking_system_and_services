@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use App\Models\ServiceOrder;
 use App\Models\Service;
 
@@ -13,6 +14,10 @@ class ServiceOrderController extends Controller
     public function userOrders()
     {
         try {
+            if (!Schema::hasTable('service_orders')) {
+                return response()->json([]);
+            }
+
             $orders = ServiceOrder::with('service')
                 ->where('user_id', Auth::id())
                 ->orderBy('created_at','desc')

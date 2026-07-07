@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useState, useEffect } from 'react';
 import api from '../../api/client';
 import Swal from 'sweetalert2';
 
@@ -9,11 +9,7 @@ export default function WalletTransactions() {
     const [searchTerm, setSearchTerm] = useState('');
     const [pagination, setPagination] = useState({});
 
-    useEffect(() => {
-        fetchTransactions();
-    }, [filter]);
-
-    const fetchTransactions = async (page = 1) => {
+    const fetchTransactions = useCallback(async (page = 1) => {
         setLoading(true);
         try {
             const params = new URLSearchParams({
@@ -46,7 +42,11 @@ export default function WalletTransactions() {
         } finally {
             setLoading(false);
         }
-    };
+    }, [filter, searchTerm]);
+
+    useEffect(() => {
+        fetchTransactions();
+    }, [fetchTransactions]);
 
     const handleApprove = async (transactionId) => {
         const result = await Swal.fire({
@@ -179,7 +179,7 @@ export default function WalletTransactions() {
     };
 
     const formatAmount = (amount) => {
-        return `৳${parseFloat(amount || 0).toFixed(2)}`;
+        return `BDT ${parseFloat(amount || 0).toFixed(2)}`;
     };
 
     const getPaymentMethodIcon = (method) => {
@@ -288,7 +288,7 @@ export default function WalletTransactions() {
                                         Total Amount
                                     </div>
                                     <div className="h5 mb-0 font-weight-bold text-gray-800">
-                                        ৳{stats.totalAmount.toFixed(2)}
+                                        BDT {stats.totalAmount.toFixed(2)}
                                     </div>
                                 </div>
                                 <div className="col-auto">

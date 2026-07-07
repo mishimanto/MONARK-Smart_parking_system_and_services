@@ -13,6 +13,7 @@ import Home from "./pages/Home";
 import Register from "./components/Register";
 import Login from "./components/Login";
 import Dashboard from "./components/Dashboard";
+import AuthLayout from "./layouts/AuthLayout";
 import ManagerLayout from "./layouts/ManagerLayout";
 import ManagerDashboard from "./components/ManagerDashboard";
 import AboutUs from './components/About';
@@ -52,19 +53,10 @@ import ServiceCenters from './pages/admin/ServiceCenters';
 
 import MechanicDashboard from './components/MechanicDashboard';
 
-// Simple reusable Spinner component
-function Spinner() {
-  return (
-    <div className="flex items-center justify-center h-screen">
-      <div className="w-12 h-12 border-4 border-blue-500 border-dashed rounded-full animate-spin"></div>
-    </div>
-  );
-}
-
 // Navbar visibility check component
 function NavbarWrapper() {
   const location = useLocation();
-  const hideNavbarPaths = ["/admin", "/manager",  "/login", "/register", "/topup", "/verify-transaction"];
+  const hideNavbarPaths = ["/admin", "/manager",  "/login", "/register", "/forgot-password", "/reset-password", "/topup", "/verify-transaction"];
 
   const shouldShowNavbar = !hideNavbarPaths.some((path) =>
     location.pathname.startsWith(path)
@@ -75,7 +67,7 @@ function NavbarWrapper() {
 
 function FooterWrapper() {
   const location = useLocation();
-  const hideFooterPaths = ["/admin", "/manager",  "/login", "/register" , "/topup", "/verify-transaction"];
+  const hideFooterPaths = ["/admin", "/manager",  "/login", "/register", "/forgot-password", "/reset-password", "/topup", "/verify-transaction"];
 
   const shouldShowFooter = !hideFooterPaths.some((path) =>
     location.pathname.startsWith(path)
@@ -87,16 +79,15 @@ function FooterWrapper() {
 function AppRoutes() {
   const { user, loading } = useContext(AuthContext);
 
-  // show spinner until auth state is ready
-  if (loading) {
-    return <Spinner />;
-  }
-
   return (
     <Routes>
       <Route path="/" element={<Home />} />
-      <Route path="/register" element={<Register />} />
-      <Route path="/login" element={<Login />} />
+      <Route element={<AuthLayout />}>
+        <Route path="/register" element={<Register />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
+      </Route>
       <Route path="/all-parkings" element={<AllParkings />} />
       <Route path="/about" element={<AboutUs />} />
       <Route path="/contact" element={<ContactUs />} />
@@ -105,22 +96,20 @@ function AppRoutes() {
       <Route path="/verify-transaction" element={<VerifyTransaction />} />
       <Route path="/services" element={<Services />} />
       <Route path="/my-services" element={<MyServices />} />
-      <Route path="/forgot-password" element={<ForgotPassword />} />
-      <Route path="/reset-password" element={<ResetPassword />} />
-      <Route path="/user-profile" element={<UserProfile />} />
+      <Route path="/user-profile" element={loading ? null : user ? <UserProfile /> : <Navigate to="/login" />} />
       
       {/* User Dashboard - only for regular users */}
       <Route
         path="/dashboard"
         element={
-          user?.role === "user" ? <Dashboard /> : <Navigate to="/" />
+          loading ? null : user?.role === "user" ? <Dashboard /> : <Navigate to="/" />
         }
       />
       
       <Route
         path="/manager"
         element={
-          user?.role === "manager" ? (
+          loading ? null : user?.role === "manager" ? (
             <ManagerDashboard />
           ) : (
             <Navigate to="/" />
@@ -133,7 +122,7 @@ function AppRoutes() {
       <Route
         path="/admin"
         element={
-          user?.role === "admin" ? <AdminLayout /> : <Navigate to="/" />
+          loading ? null : user?.role === "admin" ? <AdminLayout /> : <Navigate to="/" />
         }
       >
         <Route index element={<AdminDashboard />} />
@@ -157,7 +146,7 @@ function AppRoutes() {
       <Route
         path="/mechanic/dashboard"
         element={
-          user?.role === "mechanic" ? <MechanicDashboard /> : <Navigate to="/" />
+          loading ? null : user?.role === "mechanic" ? <MechanicDashboard /> : <Navigate to="/" />
         }
       />
 

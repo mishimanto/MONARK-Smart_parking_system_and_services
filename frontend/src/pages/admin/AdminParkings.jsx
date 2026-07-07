@@ -1,8 +1,9 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import axios from "axios";
+import { APP_BASE_URL } from "../../api/client";
 
 // Base URL configuration
-const BASE_URL = "http://127.0.0.1:8000";
+const BASE_URL = APP_BASE_URL;
 
 export default function AdminParkings() {
   const [parkings, setParkings] = useState([]);
@@ -22,7 +23,7 @@ export default function AdminParkings() {
   });
 
   // Your perfect image URL handler function
-  const getImageUrl = (image) => {
+  const getImageUrl = useCallback((image) => {
     if (!image || image === 'null') {
         return '/images/default-parking.jpg';
     }
@@ -43,9 +44,9 @@ export default function AdminParkings() {
     
     // Construct full URL using BASE_URL
     return `${BASE_URL}/storage/${cleanPath}`;
-};
+}, []);
 
-  const fetchParkings = async () => {
+  const fetchParkings = useCallback(async () => {
     setLoading(true);
     try {
       const token = localStorage.getItem('token');
@@ -105,7 +106,7 @@ export default function AdminParkings() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [getImageUrl]);
 
   const handleImageUpload = async (file) => {
     setUploading(true);
@@ -262,7 +263,7 @@ export default function AdminParkings() {
 
   useEffect(() => {
     fetchParkings();
-  }, []);
+  }, [fetchParkings]);
 
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('en-BD', {

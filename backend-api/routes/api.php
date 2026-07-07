@@ -9,19 +9,19 @@ use App\Models\About;
 use App\Models\ContactUs;
 use App\Http\Controllers\LayoutController;
 use App\Http\Controllers\AdminController;
-use App\Http\Controllers\Api\ParkingController;
-use App\Http\Controllers\Api\SlotController;
-use App\Http\Controllers\Api\BookingController;
-use App\Http\Controllers\Api\WalletController;
-use App\Http\Controllers\Api\AboutPageController;
-use App\Http\Controllers\Api\ContactPageController;
-use App\Http\Controllers\Api\ContactController;
-use App\Http\Controllers\Api\AboutController;
-use App\Http\Controllers\Api\MessageController;
-use App\Http\Controllers\Api\TeamController;
+use App\Http\Controllers\API\ParkingController;
+use App\Http\Controllers\API\SlotController;
+use App\Http\Controllers\API\BookingController;
+use App\Http\Controllers\API\WalletController;
+use App\Http\Controllers\API\AboutPageController;
+use App\Http\Controllers\API\ContactPageController;
+use App\Http\Controllers\API\ContactController;
+use App\Http\Controllers\API\AboutController;
+use App\Http\Controllers\API\MessageController;
+use App\Http\Controllers\API\TeamController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\ProfileController;
-use App\Http\Controllers\Api\ServiceCenterController;
+use App\Http\Controllers\API\ServiceCenterController;
 use App\Http\Controllers\API\AdminCenterController;
 
 
@@ -33,16 +33,11 @@ use App\Http\Controllers\MechanicController;
 
 Route::post('/register', [AuthController::class,'register']);
 Route::post('/login', [AuthController::class,'login']);
+Route::post('/forgot-password', [AuthController::class, 'sendResetLinkEmail']);
+Route::post('/reset-password', [AuthController::class, 'resetPassword']);
 
 Route::get('/parkings', [ParkingController::class, 'index']);
 Route::get('/parkings/{id}', [ParkingController::class, 'show']);
-Route::post('/parkings', [ParkingController::class, 'store']);
-Route::put('/parkings/{id}', [ParkingController::class, 'update']);
-Route::delete('/parkings/{id}', [ParkingController::class, 'destroy']);
-
-Route::post('/slots', [SlotController::class, 'store']);
-Route::put('/slots/{id}', [SlotController::class, 'update']);
-Route::delete('/slots/{id}', [SlotController::class, 'destroy']);
 
 
 Route::get('/about', [AboutController::class, 'index']);
@@ -75,8 +70,7 @@ Route::post('/contact-page', [ContactPageController::class, 'store'])->middlewar
 /*Route::get('/contact-page', [ContactController::class, 'getContactData']);
 Route::post('/contact-form', [ContactController::class, 'submitContactForm']);*/
 
-// Alternative route if above doesn't work
-Route::post('/api/contact-form', [ContactController::class, 'submitContactForm']);
+Route::post('/contact-form', [ContactController::class, 'submitContactForm']);
 
 Route::middleware('auth:sanctum')->group(function(){
     Route::post('/logout', [AuthController::class,'logout']);
@@ -125,9 +119,24 @@ Route::middleware('auth:sanctum')->group(function(){
     // বুকিং status আপডেট (Admin/Staff)
     Route::put('/service-orders/{id}/status', [ServiceOrderController::class, 'updateStatus']);
 
+    Route::get('/profile', [ProfileController::class, 'getProfile']);
+    Route::put('/profile', [ProfileController::class, 'update']);
+    Route::put('/change-password', [ProfileController::class, 'changePassword']);
+
+
+    Route::middleware('role:admin')->group(function () {
+        Route::post('/parkings', [ParkingController::class, 'store']);
+        Route::put('/parkings/{id}', [ParkingController::class, 'update']);
+        Route::delete('/parkings/{id}', [ParkingController::class, 'destroy']);
+
+        Route::post('/slots', [SlotController::class, 'store']);
+        Route::put('/slots/{id}', [SlotController::class, 'update']);
+        Route::delete('/slots/{id}', [SlotController::class, 'destroy']);
+    });
 
     //admin
 
+    Route::middleware('role:admin')->group(function () {
     Route::get('/admin/bookings', [BookingController::class, 'adminIndex']);
     Route::get('/admin/users', [AdminController::class, 'getUsers']);
     Route::put('/admin/users/{user}/block', [AdminController::class, 'blockUser']);
@@ -199,10 +208,6 @@ Route::middleware('auth:sanctum')->group(function(){
     // Service Image Upload Route
     Route::post('/admin/upload-service-image', [AdminController::class, 'uploadServiceImage']);
 
-    Route::get('/profile', [ProfileController::class, 'getProfile']);
-    Route::put('/profile', [ProfileController::class, 'update']);
-    Route::put('/change-password', [ProfileController::class, 'changePassword']);
-
     // Contact routes
     Route::apiResource('contacts', ContactController::class);
 
@@ -219,10 +224,11 @@ Route::middleware('auth:sanctum')->group(function(){
     Route::put('/admin/service-centers/{id}', [AdminCenterController::class, 'update']);
     Route::delete('/admin/service-centers/{id}', [AdminCenterController::class, 'destroy']);
     Route::patch('/admin/service-centers/{id}/status', [AdminCenterController::class, 'toggleStatus']);
+    });
 
 
     // Mechanic specific routes
-    Route::prefix('mechanic')->group(function() {
+    Route::prefix('mechanic')->middleware('role:mechanic')->group(function() {
         Route::get('/orders', [MechanicController::class, 'getAssignedOrders']);
         Route::post('/orders/{id}/start', [MechanicController::class, 'startService']);
         Route::post('/orders/{id}/complete', [MechanicController::class, 'completeService']);
@@ -248,5 +254,3 @@ Route::get('/email/verify/{id}/{hash}', function (Request $request, $id, $hash) 
     // Redirect to React login page after successful verification
     return redirect('http://localhost:5173/login?verified=1');
 })->middleware(['signed'])->name('verification.verify');
-
-

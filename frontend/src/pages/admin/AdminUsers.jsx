@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import axios from "axios";
+import { API_BASE_URL } from "../../api/client";
 
 export default function AdminUsers() {
   const [users, setUsers] = useState([]);
@@ -15,11 +16,11 @@ export default function AdminUsers() {
   const [perPage] = useState(10);
   const [actionLoading, setActionLoading] = useState(null);
 
-  const fetchUsers = async (p = 1) => {
+  const fetchUsers = useCallback(async (p = 1) => {
     setLoading(true);
     try {
       const token = localStorage.getItem('token');
-      const res = await axios.get(`http://127.0.0.1:8000/api/admin/users`, {
+      const res = await axios.get(`${API_BASE_URL}/admin/users`, {
         params: { 
           page: p, 
           per_page: perPage, 
@@ -50,11 +51,11 @@ export default function AdminUsers() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [perPage, q]);
 
   useEffect(() => {
     fetchUsers(page);
-  }, [page]);
+  }, [fetchUsers, page]);
 
   const handleSearch = (e) => {
     e.preventDefault();
@@ -76,7 +77,7 @@ export default function AdminUsers() {
     setActionLoading(userId);
     try {
       const token = localStorage.getItem('token');
-      const res = await axios.put(`http://127.0.0.1:8000/api/admin/users/${userId}/block`, {}, {
+      const res = await axios.put(`${API_BASE_URL}/admin/users/${userId}/block`, {}, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Accept': 'application/json'
@@ -106,7 +107,7 @@ export default function AdminUsers() {
     setActionLoading(userId);
     try {
       const token = localStorage.getItem('token');
-      const res = await axios.put(`http://127.0.0.1:8000/api/admin/users/${userId}/unblock`, {}, {
+      const res = await axios.put(`${API_BASE_URL}/admin/users/${userId}/unblock`, {}, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Accept': 'application/json'
@@ -136,7 +137,7 @@ export default function AdminUsers() {
     setActionLoading(userId);
     try {
       const token = localStorage.getItem('token');
-      const res = await axios.delete(`http://127.0.0.1:8000/api/admin/users/${userId}`, {
+      const res = await axios.delete(`${API_BASE_URL}/admin/users/${userId}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Accept': 'application/json'

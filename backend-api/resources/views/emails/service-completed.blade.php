@@ -15,7 +15,7 @@
         <p><strong>Service:</strong> {{ $order->service->name }}</p>
         <p><strong>Completed At:</strong> {{ now()->format('F j, Y g:i A') }}</p>
         <p><strong>Duration:</strong> {{ $order->service->duration }}</p>
-        <p><strong>Price:</strong> ৳{{ number_format($order->service->price, 2) }}</p>
+        <p><strong>Price:</strong> BDT {{ number_format($order->service->price, 2) }}</p>
         <p><strong>Invoice Number:</strong> {{ $invoice['invoice_number'] }}</p>
         <p><strong>Mechanic:</strong> {{ $invoice['mechanic_name'] }}</p>
     </div>

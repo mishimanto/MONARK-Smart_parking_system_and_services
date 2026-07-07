@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import axios from "axios";
+import { API_BASE_URL } from "../../api/client";
 
 export default function AdminReports() {
   const [parkingBookings, setParkingBookings] = useState([]);
@@ -29,53 +30,7 @@ export default function AdminReports() {
     pendingServiceBookings: 0
   });
 
-  const fetchBookings = async () => {
-    setLoading(true);
-    try {
-      const token = localStorage.getItem('token');
-      
-      // Fetch parking bookings
-      const parkingResponse = await axios.get(`http://127.0.0.1:8000/api/admin/bookings`, {
-        headers: { Authorization: `Bearer ${token}` },
-        params: {
-          per_page: 1000 // Get all bookings for reporting
-        }
-      });
-
-      // Fetch service bookings
-      const serviceResponse = await axios.get(`http://127.0.0.1:8000/api/admin/service-orders`, {
-        headers: { Authorization: `Bearer ${token}` },
-        params: {
-          per_page: 1000
-        }
-      });
-
-      if (parkingResponse.data.success) {
-        const parkingData = parkingResponse.data.data.data || [];
-        setParkingBookings(parkingData);
-        setFilteredParkingBookings(parkingData);
-      }
-
-      if (serviceResponse.data.success) {
-        const serviceData = serviceResponse.data.data.data || [];
-        setServiceBookings(serviceData);
-        setFilteredServiceBookings(serviceData);
-      }
-
-      // Calculate summary after both requests
-      calculateSummary(
-        parkingResponse.data.success ? (parkingResponse.data.data.data || []) : [],
-        serviceResponse.data.success ? (serviceResponse.data.data.data || []) : []
-      );
-
-    } catch (error) {
-      console.error('Error fetching bookings data:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const calculateSummary = (parkingData, serviceData) => {
+  const calculateSummary = useCallback((parkingData, serviceData) => {
     const totalParkingBookings = parkingData.length;
     const totalServiceBookings = serviceData.length;
     
@@ -106,9 +61,55 @@ export default function AdminReports() {
       pendingParkingBookings,
       pendingServiceBookings
     });
-  };
+  }, []);
 
-  const applyFilters = () => {
+  const fetchBookings = useCallback(async () => {
+    setLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      
+      // Fetch parking bookings
+      const parkingResponse = await axios.get(`${API_BASE_URL}/admin/bookings`, {
+        headers: { Authorization: `Bearer ${token}` },
+        params: {
+          per_page: 1000 // Get all bookings for reporting
+        }
+      });
+
+      // Fetch service bookings
+      const serviceResponse = await axios.get(`${API_BASE_URL}/admin/service-orders`, {
+        headers: { Authorization: `Bearer ${token}` },
+        params: {
+          per_page: 1000
+        }
+      });
+
+      if (parkingResponse.data.success) {
+        const parkingData = parkingResponse.data.data.data || [];
+        setParkingBookings(parkingData);
+        setFilteredParkingBookings(parkingData);
+      }
+
+      if (serviceResponse.data.success) {
+        const serviceData = serviceResponse.data.data.data || [];
+        setServiceBookings(serviceData);
+        setFilteredServiceBookings(serviceData);
+      }
+
+      // Calculate summary after both requests
+      calculateSummary(
+        parkingResponse.data.success ? (parkingResponse.data.data.data || []) : [],
+        serviceResponse.data.success ? (serviceResponse.data.data.data || []) : []
+      );
+
+    } catch (error) {
+      console.error('Error fetching bookings data:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, [calculateSummary]);
+
+  const applyFilters = useCallback(() => {
     let filteredParking = [...parkingBookings];
     let filteredService = [...serviceBookings];
 
@@ -168,6 +169,7 @@ export default function AdminReports() {
         });
         break;
       case "weekly":
+      {
         const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
         filteredParking = filteredParking.filter(booking => 
           new Date(booking.created_at) >= weekAgo
@@ -176,7 +178,9 @@ export default function AdminReports() {
           new Date(booking.created_at) >= weekAgo
         );
         break;
+      }
       case "monthly":
+      {
         const monthAgo = new Date(now.getFullYear(), now.getMonth(), 1);
         filteredParking = filteredParking.filter(booking => 
           new Date(booking.created_at) >= monthAgo
@@ -185,7 +189,9 @@ export default function AdminReports() {
           new Date(booking.created_at) >= monthAgo
         );
         break;
+      }
       case "yearly":
+      {
         const yearAgo = new Date(now.getFullYear(), 0, 1);
         filteredParking = filteredParking.filter(booking => 
           new Date(booking.created_at) >= yearAgo
@@ -194,6 +200,7 @@ export default function AdminReports() {
           new Date(booking.created_at) >= yearAgo
         );
         break;
+      }
       default:
         // "all" - no time filter
         break;
@@ -201,7 +208,7 @@ export default function AdminReports() {
 
     setFilteredParkingBookings(filteredParking);
     setFilteredServiceBookings(filteredService);
-  };
+  }, [dateRange, parkingBookings, searchTerm, serviceBookings, statusFilter, timeRange]);
 
   const handleSearch = (e) => {
     e.preventDefault();
@@ -309,11 +316,11 @@ export default function AdminReports() {
 
   useEffect(() => {
     fetchBookings();
-  }, []);
+  }, [fetchBookings]);
 
   useEffect(() => {
     applyFilters();
-  }, [timeRange, statusFilter, dateRange, searchTerm]);
+  }, [applyFilters]);
 
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('en-BD', {

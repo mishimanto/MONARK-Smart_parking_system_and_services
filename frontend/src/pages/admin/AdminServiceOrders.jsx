@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from "react";
+import React, { useCallback, useState, useEffect } from "react";
 import axios from "axios";
+import { API_BASE_URL } from "../../api/client";
 
 const AdminServiceOrders = () => {
   const [orders, setOrders] = useState([]);
@@ -12,14 +13,7 @@ const AdminServiceOrders = () => {
     total: 0
   });
 
-  // Base URL
-  const API_BASE_URL = "http://127.0.0.1:8000/api";
-
-  useEffect(() => {
-    fetchOrders();
-  }, [pagination.current_page, statusFilter]);
-
-  const fetchOrders = async () => {
+  const fetchOrders = useCallback(async () => {
     try {
       setLoading(true);
       const token = localStorage.getItem("token");
@@ -61,7 +55,11 @@ const AdminServiceOrders = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [pagination.current_page, searchTerm, statusFilter]);
+
+  useEffect(() => {
+    fetchOrders();
+  }, [fetchOrders]);
 
   // Confirm booking function - FIXED
   const confirmBooking = async (orderId) => {
@@ -123,7 +121,7 @@ const AdminServiceOrders = () => {
         alert("Status updated!");
         fetchOrders();
       }
-    } catch (error) {
+    } catch {
       alert("Failed to update status");
     }
   };
@@ -271,7 +269,7 @@ const downloadSlip = async (order) => {
   };
 
   const formatPrice = (price) => {
-    return `৳${parseFloat(price).toFixed(2)}`;
+    return `BDT ${parseFloat(price).toFixed(2)}`;
   };
 
   const handlePageChange = (newPage) => {
@@ -388,7 +386,7 @@ const downloadSlip = async (order) => {
                     Revenue
                   </div>
                   <div className="h5 mb-0 font-weight-bold text-gray-800">
-                    ৳{stats.revenue.toFixed(2)}
+                    BDT {stats.revenue.toFixed(2)}
                   </div>
                 </div>
                 <div className="col-auto">

@@ -45,7 +45,7 @@ const ContactPage = () => {
 
         try {
             // Here you would typically send the form data to your backend
-            const response = await axios.post('/api/contact-form', formData);
+            await axios.post('/api/contact-form', formData);
             
             setSubmitMessage('Thank you for your message! We will get back to you soon.');
             setFormData({

@@ -174,7 +174,7 @@ class MechanicController extends Controller
             Log::info("Sending completion email to: " . ($order->user->email ?? 'N/A'));
             
             // Generate and send PDF invoice
-            Mail::to($order->user->email)->send(new ServiceCompletedMail($order, $invoiceData));
+            Mail::to($order->user->email)->queue(new ServiceCompletedMail($order, $invoiceData));
             Log::info("Completion email with PDF invoice sent successfully");
             
         } catch (\Exception $emailError) {
