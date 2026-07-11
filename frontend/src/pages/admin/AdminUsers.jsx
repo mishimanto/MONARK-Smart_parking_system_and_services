@@ -1,17 +1,39 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useMemo, useState, useEffect } from "react";
 import axios from "axios";
-import { API_BASE_URL } from "../../api/client";
+import Swal from "sweetalert2";
+import {
+  RiDeleteBin6Line,
+  RiForbidLine,
+  RiInboxLine,
+  RiLockUnlockLine,
+  RiRefreshLine,
+  RiTimeLine,
+  RiUser3Line,
+  RiUserFollowLine,
+} from "react-icons/ri";
+import { FaBangladeshiTakaSign } from "react-icons/fa6";
+import { API_BASE_URL, bulkDeleteAdminResource, getStoredToken } from "../../api/client";
+import AdminBulkActions from "./components/AdminBulkActions";
+import AdminFilterBar from "./components/AdminFilterBar";
+import AdminPagination from "./components/AdminPagination";
+import { showErrorToast, showSuccessToast } from "../../utils/toast";
+import useBulkSelection from "./utils/useBulkSelection";
+import "./css/ParkingAdmin.css";
+import "./css/ServiceAdmin.css";
+import "./css/UserAdmin.css";
 
 export default function AdminUsers() {
   const [users, setUsers] = useState([]);
-  const [meta, setMeta] = useState({ 
-    current_page: 1, 
-    last_page: 1, 
-    per_page: 10, 
-    total: 0 
+  const [meta, setMeta] = useState({
+    current_page: 1,
+    last_page: 1,
+    per_page: 10,
+    total: 0,
   });
   const [loading, setLoading] = useState(false);
   const [q, setQ] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [emailStatusFilter, setEmailStatusFilter] = useState("");
   const [page, setPage] = useState(1);
   const [perPage] = useState(10);
   const [actionLoading, setActionLoading] = useState(null);
@@ -19,27 +41,28 @@ export default function AdminUsers() {
   const fetchUsers = useCallback(async (p = 1) => {
     setLoading(true);
     try {
-      const token = localStorage.getItem('token');
+      const token = getStoredToken();
       const res = await axios.get(`${API_BASE_URL}/admin/users`, {
-        params: { 
-          page: p, 
-          per_page: perPage, 
+        params: {
+          page: p,
+          per_page: perPage,
           q: q || undefined,
-          role: 'user'
+          status: statusFilter || undefined,
+          email_status: emailStatusFilter || undefined,
         },
         headers: {
-          'Authorization': `Bearer ${token}`,
-          'Accept': 'application/json'
-        }
+          Authorization: `Bearer ${token}`,
+          Accept: "application/json",
+        },
       });
-      
+
       if (res.data.success) {
         setUsers(res.data.data.data);
         setMeta({
           current_page: res.data.data.current_page,
           last_page: res.data.data.last_page,
           per_page: res.data.data.per_page,
-          total: res.data.data.total
+          total: res.data.data.total,
         });
       } else {
         setUsers([]);
@@ -51,340 +74,380 @@ export default function AdminUsers() {
     } finally {
       setLoading(false);
     }
-  }, [perPage, q]);
+  }, [emailStatusFilter, perPage, q, statusFilter]);
 
   useEffect(() => {
     fetchUsers(page);
   }, [fetchUsers, page]);
 
-  const handleSearch = (e) => {
-    e.preventDefault();
+  const handleSearchChange = useCallback((value) => {
+    setQ(value);
     setPage(1);
-    fetchUsers(1);
-  };
+  }, []);
 
   const handleRefresh = () => {
     setQ("");
+    setStatusFilter("");
+    setEmailStatusFilter("");
     setPage(1);
-    fetchUsers(1);
   };
 
-  const handleBlockUser = async (userId) => {
-    if (!window.confirm('Are you sure you want to block this user?')) {
-      return;
-    }
+  const handleBlockUser = async (userId, userName) => {
+    const result = await Swal.fire({
+      title: "Block user?",
+      text: `Are you sure you want to block "${userName}"?`,
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonText: "Yes, block",
+      cancelButtonText: "Cancel",
+      confirmButtonColor: "#d97706",
+      cancelButtonColor: "#64748b",
+    });
+
+    if (!result.isConfirmed) return;
 
     setActionLoading(userId);
     try {
-      const token = localStorage.getItem('token');
+      const token = getStoredToken();
       const res = await axios.put(`${API_BASE_URL}/admin/users/${userId}/block`, {}, {
         headers: {
-          'Authorization': `Bearer ${token}`,
-          'Accept': 'application/json'
-        }
+          Authorization: `Bearer ${token}`,
+          Accept: "application/json",
+        },
       });
 
       if (res.data.success) {
-        // Update local state
-        setUsers(users.map(user => 
+        setUsers((items) => items.map((user) => (
           user.id === userId ? { ...user, is_blocked: true } : user
-        ));
-        alert('User blocked successfully!');
+        )));
+        showSuccessToast("Blocked", `${userName} has been blocked.`);
       }
     } catch (err) {
       console.error("Error blocking user:", err.response?.data || err.message);
-      alert('Failed to block user');
+      showErrorToast("Failed to block user");
     } finally {
       setActionLoading(null);
     }
   };
 
-  const handleUnblockUser = async (userId) => {
-    if (!window.confirm('Are you sure you want to unblock this user?')) {
-      return;
-    }
+  const handleUnblockUser = async (userId, userName) => {
+    const result = await Swal.fire({
+      title: "Unblock user?",
+      text: `Are you sure you want to unblock "${userName}"?`,
+      icon: "question",
+      showCancelButton: true,
+      confirmButtonText: "Yes, unblock",
+      cancelButtonText: "Cancel",
+      confirmButtonColor: "#00b8c4",
+      cancelButtonColor: "#64748b",
+    });
+
+    if (!result.isConfirmed) return;
 
     setActionLoading(userId);
     try {
-      const token = localStorage.getItem('token');
+      const token = getStoredToken();
       const res = await axios.put(`${API_BASE_URL}/admin/users/${userId}/unblock`, {}, {
         headers: {
-          'Authorization': `Bearer ${token}`,
-          'Accept': 'application/json'
-        }
+          Authorization: `Bearer ${token}`,
+          Accept: "application/json",
+        },
       });
 
       if (res.data.success) {
-        // Update local state
-        setUsers(users.map(user => 
+        setUsers((items) => items.map((user) => (
           user.id === userId ? { ...user, is_blocked: false } : user
-        ));
-        alert('User unblocked successfully!');
+        )));
+        showSuccessToast("Unblocked", `${userName} has been unblocked.`);
       }
     } catch (err) {
       console.error("Error unblocking user:", err.response?.data || err.message);
-      alert('Failed to unblock user');
+      showErrorToast("Failed to unblock user");
     } finally {
       setActionLoading(null);
     }
   };
 
   const handleDeleteUser = async (userId, userName) => {
-    if (!window.confirm(`Are you sure you want to delete user "${userName}"? This action cannot be undone!`)) {
-      return;
-    }
+    const result = await Swal.fire({
+      title: "Delete user?",
+      text: `This will permanently delete "${userName}".`,
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonText: "Yes, delete",
+      cancelButtonText: "Cancel",
+      confirmButtonColor: "#dc2626",
+      cancelButtonColor: "#64748b",
+    });
+
+    if (!result.isConfirmed) return;
 
     setActionLoading(userId);
     try {
-      const token = localStorage.getItem('token');
+      const token = getStoredToken();
       const res = await axios.delete(`${API_BASE_URL}/admin/users/${userId}`, {
         headers: {
-          'Authorization': `Bearer ${token}`,
-          'Accept': 'application/json'
-        }
+          Authorization: `Bearer ${token}`,
+          Accept: "application/json",
+        },
       });
 
       if (res.data.success) {
-        // Remove user from local state
-        setUsers(users.filter(user => user.id !== userId));
-        alert('User deleted successfully!');
+        setUsers((items) => items.filter((user) => user.id !== userId));
+        showSuccessToast("Deleted", `${userName} has been deleted.`);
       }
     } catch (err) {
       console.error("Error deleting user:", err.response?.data || err.message);
-      alert('Failed to delete user');
+      showErrorToast("Failed to delete user");
     } finally {
       setActionLoading(null);
     }
   };
 
-  const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('en-BD', {
-      style: 'currency',
-      currency: 'BDT',
-      minimumFractionDigits: 0
-    }).format(amount);
-  };
+  const formatCurrency = (amount) =>
+    new Intl.NumberFormat("en-BD", {
+      style: "currency",
+      currency: "BDT",
+      minimumFractionDigits: 0,
+    }).format(amount || 0);
 
-  const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleString('en-BD', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
+  const formatDate = (dateString) =>
+    new Date(dateString).toLocaleString("en-BD", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
     });
+
+  const stats = useMemo(() => {
+    const active = users.filter((user) => !user.is_blocked).length;
+    const blocked = users.filter((user) => user.is_blocked).length;
+    const visibleWallet = users.reduce((sum, user) => sum + Number(user.wallet_balance || 0), 0);
+    return { active, blocked, visibleWallet };
+  }, [users]);
+  const bulk = useBulkSelection(users);
+
+  const statCards = [
+    { label: "Total Users", value: meta.total, icon: <RiUser3Line /> },
+    { label: "Active Users", value: stats.active, icon: <RiUserFollowLine /> },
+    { label: "Wallet", value: formatCurrency(stats.visibleWallet), icon: <FaBangladeshiTakaSign /> },
+  ];
+
+  const handleBulkDelete = async () => {
+    const result = await Swal.fire({
+      title: `Delete ${bulk.selectedCount} users?`,
+      text: "Only regular users will be deleted. Protected users will be skipped.",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonText: "Yes, delete selected",
+      cancelButtonText: "Cancel",
+      confirmButtonColor: "#991b1b",
+      cancelButtonColor: "#64748b",
+    });
+    if (!result.isConfirmed) return;
+
+    setActionLoading("bulk");
+    try {
+      const response = await bulkDeleteAdminResource("users", bulk.selectedNumericIds);
+      bulk.clearSelection();
+      showSuccessToast("Bulk delete complete", response.message);
+      fetchUsers(page);
+    } catch (err) {
+      showErrorToast("Bulk delete failed", err.response?.data?.message || "Please try again.");
+    } finally {
+      setActionLoading(null);
+    }
   };
 
   return (
-    <div className="container-fluid py-4">
-      <div className="card border-0 shadow-lg rounded-3 overflow-hidden">
-        {/* Header Section */}
-        <div className="card-header bg-gradient-primary text-white border-0 py-4 px-4">
-          <div className="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-3">
-            {/*<div className="mb-3 mb-md-0">
-              <h4 className="mb-2 fw-bold">
-                <i className="fas fa-users me-3"></i>
-                Regular Users Management
-              </h4>
-              <p className="mb-0 opacity-75 fw-light">
-                Overview of all regular users in the system
-              </p>
-            </div>*/}
-            
-            <div className="d-flex flex-column flex-sm-row gap-3 w-100 w-md-auto">
-              <form onSubmit={handleSearch} className="d-flex gap-2 flex-grow-1">
-                <div className="position-relative flex-grow-1">
-                  <i className="fas fa-search position-absolute top-50 start-0 translate-middle-y ms-3 text-muted"></i>
-                  <input 
-                    className="form-control form-control-lg border-0 rounded-pill ps-5 shadow-sm"
-                    placeholder="Search users..."
-                    value={q}
-                    onChange={(e) => setQ(e.target.value)} 
-                  />
-                </div>
-                <button 
-                  type="submit"
-                  className="btn btn-light btn-lg rounded-pill px-4 shadow-sm fw-semibold"
-                >
-                  <i className="fas fa-search me-2"></i>
-                  Search
-                </button>
-              </form>
-              
-              <button 
-                onClick={handleRefresh}
-                className="btn btn-light btn-lg rounded-pill px-4 shadow-sm fw-semibold"
-              >
-                <i className="fas fa-sync-alt me-2"></i>
-                Refresh
+    <section className="parking-admin-page service-admin-page users-admin-page">
+      <div className="parking-admin-hero">
+        <div>
+          <h1>Regular Users</h1>
+        </div>
+        <button className="pa-btn pa-btn-ghost" type="button" onClick={handleRefresh}>
+          <RiRefreshLine /> Refresh
+        </button>
+      </div>
+
+      <div className="pa-stat-grid">
+        {statCards.map((card) => (
+          <article className="pa-stat-card" key={card.label}>
+            <div>
+              <span>{card.label}</span>
+              <strong>{card.value}</strong>
+            </div>
+            {card.icon}
+          </article>
+        ))}
+      </div>
+
+      <AdminFilterBar
+        searchValue={q}
+        searchPlaceholder="Search by user name, email, or ID"
+        onSearchChange={handleSearchChange}
+        filters={[
+          {
+            id: "status",
+            label: "Account Status",
+            value: statusFilter,
+            onChange: (value) => {
+              setStatusFilter(value);
+              setPage(1);
+            },
+            options: [
+              { value: "", label: "All Status" },
+              { value: "active", label: "Active" },
+              { value: "blocked", label: "Blocked" },
+            ],
+          },
+          {
+            id: "email_status",
+            label: "Email Status",
+            value: emailStatusFilter,
+            onChange: (value) => {
+              setEmailStatusFilter(value);
+              setPage(1);
+            },
+            options: [
+              { value: "", label: "All Email" },
+              { value: "verified", label: "Verified" },
+              { value: "unverified", label: "Unverified" },
+            ],
+          },
+        ]}
+      />
+
+      <div className="pa-panel">
+        {loading ? (
+          <div className="pa-empty-state">Loading users data...</div>
+        ) : users.length === 0 ? (
+          <div className="pa-empty-state">
+            <RiInboxLine />
+            <h3>No users found</h3>
+            <p>{q || statusFilter || emailStatusFilter ? "No users match your filters." : "There are no regular users in the system yet."}</p>
+            {(q || statusFilter || emailStatusFilter) && (
+              <button className="pa-btn pa-btn-primary" type="button" onClick={handleRefresh}>
+                Clear Filters
               </button>
-            </div>
+            )}
           </div>
-        </div>
-
-        {/* Table Section */}
-        <div className="card-body p-0">
-          {loading ? (
-            <div className="text-center py-5 my-5">
-              <div className="spinner-grow text-primary mb-4" style={{width: '3rem', height: '3rem'}} role="status">
-                <span className="visually-hidden">Loading...</span>
-              </div>
-              <h5 className="text-muted mb-2">Loading Users Data</h5>
-              <p className="text-muted">Please wait while we fetch user information</p>
-            </div>
-          ) : users.length === 0 ? (
-            <div className="text-center py-5 my-5">
-              <div className="bg-light rounded-3 p-5 mx-auto" style={{maxWidth: '400px'}}>
-                <i className="fas fa-user-slash fa-4x text-muted mb-4"></i>
-                <h4 className="text-muted mb-3">No Regular Users Found</h4>
-                <p className="text-muted mb-4">
-                  {q ? 'No users match your search criteria. Try different keywords.' : 'There are no regular users in the system at the moment.'}
-                </p>
-                {q && (
-                  <button 
-                    onClick={handleRefresh}
-                    className="btn btn-primary rounded-pill px-4"
-                  >
-                    <i className="fas fa-times me-2"></i>
-                    Clear Search
-                  </button>
-                )}
-              </div>
-            </div>
-          ) : (
-            <div className="table-responsive">
-              <table className="table table-hover align-middle mb-0">
-                <thead className="table-light">
-                  <tr>
-                    <th className="text-center border-0 py-4 fw-bold text-uppercase text-muted small bg-light">User ID</th>
-                    <th className="text-center border-0 py-4 fw-bold text-uppercase text-muted small bg-light">User Details</th>
-                    <th className="text-center border-0 py-4 fw-bold text-uppercase text-muted small bg-light">Wallet Balance</th>
-                    <th className="text-center border-0 py-4 fw-bold text-uppercase text-muted small bg-light">Status</th>
-                    <th className="text-center border-0 py-4 fw-bold text-uppercase text-muted small bg-light">Registration Date</th>
-                    <th className="text-center border-0 py-4 fw-bold text-uppercase text-muted small bg-light">Total Bookings</th>
-                    <th className="text-center border-0 py-4 fw-bold text-uppercase text-muted small bg-light">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {users.map(user => (
-                    <tr key={user.id} className="border-top border-light">
-                      <td className="text-center py-4">
-                        <span className="fw-bold text-primary fs-6">#{user.id}</span>
-                      </td>
-                      <td className="text-center py-4">
-                        <div className="d-flex flex-column align-items-center">
-                          <span className="fw-semibold text-dark mb-1">{user.name}</span>
-                          <small className="text-muted">{user.email}</small>
+        ) : (
+          <>
+          <AdminBulkActions
+            selectedCount={bulk.selectedCount}
+            totalCount={users.length}
+            label="regular users"
+            disabled={actionLoading === "bulk"}
+            onToggleAll={bulk.toggleAllVisible}
+            onClear={bulk.clearSelection}
+            onDelete={handleBulkDelete}
+          />
+          <div className="pa-table-wrap">
+            <table className="pa-table users-table">
+              <thead>
+                <tr>
+                  <th className="pa-select-col">Select</th>
+                  <th>User</th>
+                  <th>Wallet Balance</th>
+                  <th>Status</th>
+                  <th>Registration Date</th>
+                  <th>Total Bookings</th>
+                  <th className="users-actions-col">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {users.map((user) => (
+                  <tr key={user.id}>
+                    <td className="pa-select-col">
+                      <label className="pa-row-check" title={`Select ${user.name}`}>
+                        <input type="checkbox" checked={bulk.isSelected(user.id)} onChange={() => bulk.toggleSelection(user.id)} />
+                      </label>
+                    </td>
+                    <td>
+                      <div className="users-identity">
+                        <span className="users-avatar">{user.name?.charAt(0)?.toUpperCase() || "U"}</span>
+                        <div>
+                          <strong>{user.name}</strong>
+                          <span className="pa-cell-note">#{user.id} · {user.email}</span>
                         </div>
-                      </td>
-                      <td className="text-center py-4">
-                        <span className="fw-bold text-success fs-6">
-                          {formatCurrency(user.wallet_balance)}
-                        </span>
-                      </td>
-                      <td className="text-center py-4">
-                        <span className={`badge ${user.is_blocked ? 'bg-danger' : 'bg-success'} px-3 py-2`}>
-                          <i className={`fas ${user.is_blocked ? 'fa-ban' : 'fa-check-circle'} me-2`}></i>
-                          {user.is_blocked ? 'Blocked' : 'Active'}
-                        </span>
-                      </td>
-                      <td className="text-center py-4">
-                        <div className="d-flex flex-column align-items-center">
-                          <small className="text-muted fw-semibold">{formatDate(user.created_at)}</small>
-                        </div>
-                      </td>
-                      <td className="text-center py-4">
-                        <span className="badge bg-info px-3 py-2">
-                          <i className="fas fa-calendar-check me-2"></i>
-                          {user.bookings_count || 0}
-                        </span>
-                      </td>
-                      <td className="text-center py-4">
-                        <div className="d-flex justify-content-center gap-2">
-                          {/* Block/Unblock Button */}
-                          {user.is_blocked ? (
-                            <button
-                              className="btn btn-success btn-sm rounded-pill px-3"
-                              onClick={() => handleUnblockUser(user.id)}
-                              disabled={actionLoading === user.id}
-                            >
-                              {actionLoading === user.id ? (
-                                <span className="spinner-border spinner-border-sm me-1" />
-                              ) : (
-                                <i className="fas fa-unlock me-1"></i>
-                              )}
-                              Unblock
-                            </button>
-                          ) : (
-                            <button
-                              className="btn btn-warning btn-sm rounded-pill px-3"
-                              onClick={() => handleBlockUser(user.id)}
-                              disabled={actionLoading === user.id}
-                            >
-                              {actionLoading === user.id ? (
-                                <span className="spinner-border spinner-border-sm me-1" />
-                              ) : (
-                                <i className="fas fa-ban me-1"></i>
-                              )}
-                              Block
-                            </button>
-                          )}
-                          
-                          {/* Delete Button */}
+                      </div>
+                    </td>
+                    <td className="pa-price">
+                      <span className="pa-price-value">
+                        {formatCurrency(user.wallet_balance)}
+                      </span>
+                    </td>
+                    <td className="text-center">
+                      <span className={`pa-status ${user.is_blocked ? "is-danger" : "is-live"}`}>
+                        {user.is_blocked ? "Blocked" : "Active"}
+                      </span>
+                    </td>
+                    <td className="text-center">
+                      <span className="pa-icon-text">
+                        <RiTimeLine /> {formatDate(user.created_at)}
+                      </span>
+                    </td>
+                    <td className="text-center">
+                      <span className="text-gray-600 font-semibold is-soft">
+                        {user.bookings_count || 0}
+                      </span>
+                    </td>
+                    <td className="text-center">
+                      <div className="pa-row-actions users-row-actions">
+                        {user.is_blocked ? (
                           <button
-                            className="btn btn-danger btn-sm rounded-pill px-3"
-                            onClick={() => handleDeleteUser(user.id, user.name)}
-                            disabled={actionLoading === user.id}
+                            className="pa-icon-btn users-action-btn is-confirm"
+                            type="button"
+                            onClick={() => handleUnblockUser(user.id, user.name)}
+                            disabled={actionLoading === user.id || user.role !== "user"}
+                            title="Unblock user"
                           >
-                            {actionLoading === user.id ? (
-                              <span className="spinner-border spinner-border-sm me-1" />
-                            ) : (
-                              <i className="fas fa-trash me-1"></i>
-                            )}
-                            Delete
+                            <RiLockUnlockLine />
                           </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
+                        ) : (
+                          <button
+                            className="pa-icon-btn users-action-btn"
+                            type="button"
+                            onClick={() => handleBlockUser(user.id, user.name)}
+                            disabled={actionLoading === user.id || user.role !== "user"}
+                            title="Block user"
+                          >
+                            <RiForbidLine />
+                          </button>
+                        )}
 
-        {/* Pagination */}
-        {meta.last_page > 1 && !loading && (
-          <div className="card-footer bg-white border-0 py-4 px-4">
-            <div className="d-flex flex-column flex-lg-row justify-content-between align-items-center gap-4">
-              <div className="text-muted fw-semibold">
-                Displaying <span className="text-primary fw-bold">{((meta.current_page - 1) * meta.per_page) + 1}</span> to{" "}
-                <span className="text-primary fw-bold">{Math.min(meta.current_page * meta.per_page, meta.total)}</span> of{" "}
-                <span className="text-primary fw-bold">{meta.total}</span> regular users
-              </div>
-              
-              <div className="d-flex gap-3">
-                <button 
-                  className="btn btn-outline-primary btn-lg rounded-pill px-4 fw-semibold d-flex align-items-center" 
-                  disabled={meta.current_page <= 1} 
-                  onClick={() => setPage(page - 1)}
-                >
-                  <i className="fas fa-chevron-left me-2"></i>
-                  Previous Page
-                </button>
-                <button 
-                  className="btn btn-outline-primary btn-lg rounded-pill px-4 fw-semibold d-flex align-items-center" 
-                  disabled={meta.current_page >= meta.last_page} 
-                  onClick={() => setPage(page + 1)}
-                >
-                  Next Page
-                  <i className="fas fa-chevron-right ms-2"></i>
-                </button>
-              </div>
-            </div>
+                        <button
+                          className="pa-icon-btn users-action-btn is-danger"
+                          type="button"
+                          onClick={() => handleDeleteUser(user.id, user.name)}
+                          disabled={actionLoading === user.id || user.role !== "user"}
+                          title="Delete user"
+                        >
+                          <RiDeleteBin6Line />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
+          </>
+        )}
+
+        {!loading && (
+          <AdminPagination
+            currentPage={meta.current_page}
+            lastPage={meta.last_page}
+            perPage={meta.per_page}
+            total={meta.total}
+            label="regular users"
+            onPageChange={setPage}
+          />
         )}
       </div>
-    </div>
+    </section>
   );
 }

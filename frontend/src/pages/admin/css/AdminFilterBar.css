@@ -1,0 +1,105 @@
+.admin-filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.admin-filter-search {
+  flex: 1;
+  min-width: 220px;
+  min-height: 46px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid rgba(8, 145, 178, 0.14);
+  border-radius: 4px;
+  background: #f8fbff;
+  color: #0891b2;
+  padding: 0 14px;
+}
+
+.admin-filter-search input {
+  width: 100%;
+  min-height: 44px;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: #0f172a;
+}
+
+.admin-filter-bar select,
+.admin-filter-field {
+  min-height: 46px;
+  min-width: 170px;
+  border: 1px solid rgba(8, 145, 178, 0.14);
+  border-radius: 4px;
+  background: #ffffff;
+  color: #0f172a;
+  padding: 0 12px;
+  font-size: 13px;
+  font-weight: 800;
+  outline: none;
+}
+
+.admin-filter-search:focus-within,
+.admin-filter-bar select:focus,
+.admin-filter-field:focus {
+  border-color: rgba(0, 247, 255, 0.66);
+  box-shadow: 0 0 0 3px rgba(0, 247, 255, 0.1);
+}
+
+.admin-filter-clear,
+.admin-filter-actions > * {
+  min-height: 46px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid rgba(8, 145, 178, 0.18);
+  border-radius: 4px;
+  background: #ffffff;
+  color: #0f172a;
+  padding: 0 14px;
+  font-size: 13px;
+  font-weight: 900;
+  text-decoration: none;
+}
+
+.admin-filter-clear:hover,
+.admin-filter-actions > *:hover {
+  border-color: #00f7ff;
+  background: rgba(0, 247, 255, 0.08);
+}
+
+.admin-filter-clear:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.admin-filter-clear:disabled:hover {
+  border-color: rgba(8, 145, 178, 0.18);
+  background: #ffffff;
+}
+
+.admin-filter-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+}
+
+@media (max-width: 900px) {
+  .admin-filter-bar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .admin-filter-bar select,
+  .admin-filter-field,
+  .admin-filter-clear,
+  .admin-filter-actions,
+  .admin-filter-actions > * {
+    width: 100%;
+  }
+}

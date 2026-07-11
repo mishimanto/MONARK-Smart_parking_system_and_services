@@ -1,7 +1,9 @@
-import React, { useState, useEffect } from "react";
+import React, { useContext, useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import api, { APP_BASE_URL, bookingAPI, walletAPI } from "../api/client";
+import { AuthContext } from "../contexts/AuthContext";
 import Swal from "sweetalert2";
+import { showErrorToast, showSuccessToast } from "../utils/toast";
 import {
     RiArrowLeftLine,
     RiCarLine,
@@ -12,6 +14,7 @@ import {
     RiTimerFlashLine,
     RiWallet3Line,
 } from "react-icons/ri";
+import { FaCalendarCheck } from "react-icons/fa";
 import "./css/ParkingDetail.css";
 
 const BASE_URL = APP_BASE_URL;
@@ -62,8 +65,9 @@ const isSlotAvailable = (slot) => (
 );
 
 export default function ParkingDetail() {
-    const { id } = useParams();
+    const { slug } = useParams();
     const navigate = useNavigate();
+    const { user } = useContext(AuthContext);
     const [parking, setParking] = useState(null);
     const [selectedSlot, setSelectedSlot] = useState(null);
     const [bookingHours, setBookingHours] = useState(1);
@@ -73,8 +77,12 @@ export default function ParkingDetail() {
     useEffect(() => {
         const fetchData = async () => {
             try {
-                const parkingRes = await api.get(`/parkings/${id}`);
+                const parkingRes = await api.get(`/parkings/${slug}`);
                 const parkingData = parkingRes.data;
+
+                if (parkingData.slug && parkingData.slug !== slug) {
+                    navigate(`/parking/${parkingData.slug}`, { replace: true });
+                }
 
                 const processedParking = {
                     ...parkingData,
@@ -83,16 +91,20 @@ export default function ParkingDetail() {
 
                 setParking(processedParking);
 
-                const token = localStorage.getItem("token");
-                if (token) {
-                    const walletRes = await walletAPI.getBalance();
+                if (user?.role === "user") {
+                    try {
+                        const walletRes = await walletAPI.getBalance();
 
-                    if (walletRes && walletRes.data && typeof walletRes.data.balance !== "undefined") {
-                        setWalletBalance(walletRes.data.balance);
-                    } else if (walletRes && typeof walletRes.balance !== "undefined") {
-                        setWalletBalance(walletRes.balance);
-                    } else {
-                        console.warn("Wallet API returned unexpected response:", walletRes);
+                        if (walletRes && walletRes.data && typeof walletRes.data.balance !== "undefined") {
+                            setWalletBalance(walletRes.data.balance);
+                        } else if (walletRes && typeof walletRes.balance !== "undefined") {
+                            setWalletBalance(walletRes.balance);
+                        } else {
+                            console.warn("Wallet API returned unexpected response:", walletRes);
+                            setWalletBalance(0);
+                        }
+                    } catch (walletError) {
+                        console.warn("Wallet balance unavailable:", walletError.response?.data || walletError.message);
                         setWalletBalance(0);
                     }
                 }
@@ -101,7 +113,7 @@ export default function ParkingDetail() {
             }
         };
         fetchData();
-    }, [id]);
+    }, [navigate, slug, user?.role]);
 
     const handleBookNow = async () => {
         const token = localStorage.getItem("token");
@@ -113,6 +125,11 @@ export default function ParkingDetail() {
                 text: "Please login first to book a parking spot!",
                 confirmButtonText: "OK",
             }).then(() => navigate("/login"));
+            return;
+        }
+
+        if (user?.role !== "user") {
+            showErrorToast("Customer account required", "Only customer accounts can book parking.");
             return;
         }
 
@@ -141,20 +158,11 @@ export default function ParkingDetail() {
             const refreshedBalance = newBalanceRes.data?.balance || 0;
             setWalletBalance(refreshedBalance);
 
-            Swal.fire({
-                icon: "success",
-                title: "Booking Successful!",
-                html: `
-                <div style="text-align: left;">
-                    <p><strong>Parking:</strong> ${parking.name}</p>
-                    <p><strong>Slot:</strong> ${selectedSlot.slot_code}</p>
-                    <p><strong>Duration:</strong> ${bookingHours} hour${bookingHours > 1 ? "s" : ""}</p>
-                    <p><strong>Total Paid:</strong> BDT ${(bookingHours * parking.price_per_hour).toFixed(2)}</p>
-                    <p><strong>New Wallet Balance:</strong> BDT ${refreshedBalance}</p>
-                </div>
-            `,
-                confirmButtonText: "View Dashboard",
-            }).then(() => navigate("/dashboard"));
+            showSuccessToast(
+                "Booking Successful",
+                `${parking.name} - Slot ${selectedSlot.slot_code}. Paid BDT ${(bookingHours * parking.price_per_hour).toFixed(2)}.`
+            );
+            navigate("/dashboard");
 
         } catch (err) {
             console.error("Booking error:", err.response?.data || err.message);
@@ -173,12 +181,7 @@ export default function ParkingDetail() {
                 errorMessage = err.response.data.message;
             }
 
-            Swal.fire({
-                icon: "error",
-                title: "Booking Failed",
-                text: errorMessage,
-                confirmButtonText: "OK",
-            });
+            showErrorToast("Booking Failed", errorMessage);
         } finally {
             setLoading(false);
         }
@@ -230,7 +233,6 @@ export default function ParkingDetail() {
 
                     <div className="parking-detail-info">
                         <div className="parking-detail-title-row">
-                            <span className="parking-detail-kicker">Premium Parking</span>
                             <h1>{parking.name}</h1>
                             <p>{parking.description || "Reserve a reliable parking slot with wallet payment and instant confirmation."}</p>
                         </div>
@@ -265,7 +267,7 @@ export default function ParkingDetail() {
                         </div>
 
                         <div className="parking-wallet-card">
-                            <RiWallet3Line />
+
                             <div>
                                 <span>Your Wallet Balance</span>
                                 <strong>BDT {walletBalance}</strong>
@@ -278,7 +280,6 @@ export default function ParkingDetail() {
                 <section className="parking-booking-grid">
                     <div className="parking-slots-panel">
                         <div className="parking-section-head">
-                            <span>Select Slot</span>
                             <h2>Available Parking Slots</h2>
                         </div>
                         <div className="parking-slots-grid">
@@ -318,7 +319,6 @@ export default function ParkingDetail() {
 
                     <aside className="parking-booking-panel">
                         <div className="parking-booking-head">
-                            <span>Booking Summary</span>
                             <h2>Confirm Your Slot</h2>
                         </div>
 
@@ -349,15 +349,15 @@ export default function ParkingDetail() {
                                 <div className="parking-price-summary">
                                     <div>
                                         <span>Price/hour</span>
-                                        <strong>BDT {pricePerHour}</strong>
+                                        <strong>BDT {pricePerHour.toFixed(2)}</strong>
                                     </div>
                                     <div>
                                         <span>Duration</span>
                                         <strong>{bookingHours} hour{bookingHours > 1 ? "s" : ""}</strong>
                                     </div>
-                                    <div className="parking-total-row">
+                                    <div>
                                         <span>Total Amount</span>
-                                        <strong>BDT {totalAmount.toFixed(2)}</strong>
+                                        <b className="text-xl text-red-600">BDT {totalAmount.toFixed(2)}</b>
                                     </div>
                                 </div>
 
@@ -374,7 +374,7 @@ export default function ParkingDetail() {
                                         </>
                                     ) : (
                                         <>
-                                            <RiSecurePaymentLine />
+                                            <FaCalendarCheck />
                                             Confirm Booking
                                         </>
                                     )}

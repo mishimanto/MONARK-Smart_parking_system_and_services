@@ -1,0 +1,32 @@
+.storefront-loader {
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  display: grid;
+  place-items: center;
+  background:
+    radial-gradient(circle at 50% 46%, rgba(0, 247, 255, 0.14), transparent 34%),
+    linear-gradient(135deg, #020617 0%, #081025 54%, #03131e 100%);
+  animation: storefront-loader-in 0.18s ease forwards;
+}
+
+.storefront-loader-art {
+  width: min(280px, 58vw);
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+}
+
+.storefront-loader-art > * {
+  width: 100%;
+  height: 100%;
+}
+
+@keyframes storefront-loader-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}

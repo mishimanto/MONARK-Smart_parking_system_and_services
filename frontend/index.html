@@ -4,8 +4,43 @@
     <meta charset="UTF-8" />
     <!-- <link rel="icon" type="image/svg+xml" href="/vite.svg" /> -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>MONARK</title>
-    <!-- Font Awesome is still used by unconverted admin pages. -->
+	    <title>MONARK</title>
+	    <style>
+	      html.show-storefront-loader body::before {
+	        content: "";
+	        position: fixed;
+	        inset: 0;
+	        z-index: 2999;
+	        background:
+	          radial-gradient(circle at 50% 46%, rgba(0, 247, 255, 0.14), transparent 34%),
+	          linear-gradient(135deg, #020617 0%, #081025 54%, #03131e 100%);
+	      }
+	    </style>
+	    <script>
+	      (() => {
+	        const nonStorefrontPrefixes = [
+	          "/admin",
+	          "/manager",
+	          "/mechanic",
+	          "/login",
+	          "/register",
+	          "/forgot-password",
+	          "/reset-password",
+	          "/topup",
+	          "/verify-transaction",
+	          "/dashboard",
+	          "/user-profile",
+	          "/my-services",
+	        ];
+	        const isStorefront = !nonStorefrontPrefixes.some((prefix) =>
+	          window.location.pathname.startsWith(prefix)
+	        );
+	        if (isStorefront) {
+	          document.documentElement.classList.add("show-storefront-loader");
+	        }
+	      })();
+	    </script>
+	    <!-- Font Awesome is still used by unconverted admin pages. -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
   </head>
   <body>

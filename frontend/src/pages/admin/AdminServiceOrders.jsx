@@ -1,8 +1,26 @@
-import React, { useCallback, useState, useEffect } from "react";
+import React, { useCallback, useContext, useState, useEffect } from "react";
 import axios from "axios";
-import { API_BASE_URL } from "../../api/client";
+import {
+  RiCalendarCheckLine,
+  RiDownloadLine,
+  RiRefreshLine,
+  RiServiceLine,
+  RiTimeLine,
+  RiWallet3Line,
+} from "react-icons/ri";
+import { FaBangladeshiTakaSign } from "react-icons/fa6";
+import { HiWrenchScrewdriver } from "react-icons/hi2";
+import { API_BASE_URL, getStoredToken } from "../../api/client";
+import AdminFilterBar from "./components/AdminFilterBar";
+import AdminPagination from "./components/AdminPagination";
+import { confirmAdminAction, showAdminError, showAdminSuccess } from "./utils/adminAlerts";
+import { AuthContext } from "../../contexts/AuthContext";
+import { hasPermission } from "../../utils/permissions";
+import "./css/ParkingAdmin.css";
+import "./css/ServiceAdmin.css";
 
 const AdminServiceOrders = () => {
+  const { user } = useContext(AuthContext);
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -16,10 +34,10 @@ const AdminServiceOrders = () => {
   const fetchOrders = useCallback(async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem("token");
+      const token = getStoredToken();
       
       if (!token) {
-        alert("Please login first");
+        showAdminError("Please login first");
         return;
       }
 
@@ -39,8 +57,6 @@ const AdminServiceOrders = () => {
         }
       );
 
-      console.log("API Response:", response.data);
-
       if (response.data.success) {
         setOrders(response.data.data.data);
         setPagination({
@@ -51,7 +67,7 @@ const AdminServiceOrders = () => {
       }
     } catch (error) {
       console.error("Error:", error);
-      alert("Failed to load service orders");
+      showAdminError("Failed to load service orders", error.response?.data?.message || "Please try again.");
     } finally {
       setLoading(false);
     }
@@ -61,12 +77,17 @@ const AdminServiceOrders = () => {
     fetchOrders();
   }, [fetchOrders]);
 
-  // Confirm booking function - FIXED
   const confirmBooking = async (orderId) => {
-    if (!confirm('Confirm this booking and send confirmation email?')) return;
+    const result = await confirmAdminAction({
+      title: "Confirm this booking?",
+      text: "A confirmation email will be sent to the customer.",
+      confirmButtonText: "Yes, confirm",
+      confirmButtonColor: "#00b8c4",
+    });
+    if (!result.isConfirmed) return;
 
     try {
-      const token = localStorage.getItem("token");
+      const token = getStoredToken();
       const response = await axios.post(
         `${API_BASE_URL}/admin/service-orders/${orderId}/confirm`,
         {}, // empty object since no data is being sent in body
@@ -80,32 +101,33 @@ const AdminServiceOrders = () => {
       );
 
       if (response.data.success) {
-        alert('✅ Booking confirmed! Email sent to customer.');
-        fetchOrders(); // Refresh the orders list
+        showAdminSuccess("Booking confirmed", "Email sent to customer.");
+        fetchOrders();
       } else {
-        alert(response.data.message || 'Failed to confirm booking');
+        showAdminError("Failed to confirm booking", response.data.message || "Please try again.");
       }
     } catch (error) {
       console.error('Confirm booking error:', error);
       if (error.response) {
-        // Server responded with error status
-        alert(error.response.data.message || 'Failed to confirm booking');
+        showAdminError("Failed to confirm booking", error.response.data.message || "Please try again.");
       } else if (error.request) {
-        // Request was made but no response received
-        alert('Network error: Could not connect to server');
+        showAdminError("Network error", "Could not connect to server.");
       } else {
-        // Something else happened
-        alert('Error: ' + error.message);
+        showAdminError("Error", error.message);
       }
     }
   };
 
-  // Update order status
   const updateOrderStatus = async (orderId, newStatus) => {
-    if (!confirm(`Change status to ${newStatus}?`)) return;
+    const result = await confirmAdminAction({
+      title: `Change status to ${newStatus}?`,
+      confirmButtonText: "Yes, update",
+      confirmButtonColor: "#00b8c4",
+    });
+    if (!result.isConfirmed) return;
 
     try {
-      const token = localStorage.getItem("token");
+      const token = getStoredToken();
       const response = await axios.put(
         `${API_BASE_URL}/admin/service-orders/${orderId}/status`,
         { status: newStatus },
@@ -118,24 +140,18 @@ const AdminServiceOrders = () => {
       );
 
       if (response.data.success) {
-        alert("Status updated!");
+        showAdminSuccess("Status updated");
         fetchOrders();
       }
-    } catch {
-      alert("Failed to update status");
+    } catch (error) {
+      showAdminError("Failed to update status", error.response?.data?.message || "Please try again.");
     }
   };
 
-  // Slip ডাউনলোড ফাংশন
-  // AdminServiceOrders.jsx - downloadSlip function এ update করুন
 const downloadSlip = async (order) => {
   try {
-    const token = localStorage.getItem("token");
-    console.log('Token available:', !!token);
-    console.log('Order ID:', order.id);
-    console.log('Slip number:', order.slip_number);
+    const token = getStoredToken();
 
-    // Test API call first
     const testResponse = await fetch(
       `${API_BASE_URL}/admin/service-orders/${order.id}/download-slip`,
       {
@@ -146,11 +162,8 @@ const downloadSlip = async (order) => {
         },
       }
     );
-
-    console.log('Test response status:', testResponse.status);
     
     if (testResponse.status === 200) {
-      // If test successful, proceed with download
       const response = await fetch(
         `${API_BASE_URL}/admin/service-orders/${order.id}/download-slip`,
         {
@@ -172,25 +185,23 @@ const downloadSlip = async (order) => {
         a.click();
         window.URL.revokeObjectURL(url);
         document.body.removeChild(a);
-        console.log('Slip downloaded successfully');
       } else {
         const errorData = await response.json();
-        alert(errorData.message || 'Download failed');
+        showAdminError("Download failed", errorData.message || "Please try again.");
       }
     } else {
       const errorData = await testResponse.json();
-      alert(`API Error: ${errorData.message || testResponse.statusText}`);
+      showAdminError("API Error", errorData.message || testResponse.statusText);
     }
   } catch (error) {
     console.error('Download slip error:', error);
-    alert('Network error: ' + error.message);
+    showAdminError("Network error", error.message);
   }
 };
 
-  // Invoice ডাউনলোড ফাংশন - FIXED Syntax Error
   const downloadInvoice = async (order) => {
     try {
-      const token = localStorage.getItem("token");
+      const token = getStoredToken();
       
       const response = await fetch(
         `${API_BASE_URL}/admin/service-orders/${order.id}/download-invoice`,
@@ -219,11 +230,10 @@ const downloadSlip = async (order) => {
       }
     } catch (error) {
       console.error('Download invoice error:', error);
-      alert(error.message || 'Failed to download invoice');
+      showAdminError("Failed to download invoice", error.message || "Please try again.");
     }
   };
 
-  // Get status badge configuration
   const getStatusBadge = (status) => {
     const statusConfig = {
       'pending': { class: 'bg-warning text-dark', label: 'Pending' },
@@ -236,7 +246,6 @@ const downloadSlip = async (order) => {
     return statusConfig[status] || { class: 'bg-secondary', label: status };
   };
 
-  // Get available actions for each status
   const getAvailableActions = (order) => {
     const actions = {
       'pending': [
@@ -258,10 +267,9 @@ const downloadSlip = async (order) => {
     return actions[order.status] || [];
   };
 
-  const handleSearch = (e) => {
-    e.preventDefault();
+  const handleSearchChange = (value) => {
+    setSearchTerm(value);
     setPagination(prev => ({ ...prev, current_page: 1 }));
-    fetchOrders();
   };
 
   const formatDate = (dateString) => {
@@ -276,7 +284,6 @@ const downloadSlip = async (order) => {
     setPagination(prev => ({ ...prev, current_page: newPage }));
   };
 
-  // Calculate stats from orders
   const stats = {
     total_orders: pagination.total,
     pending_orders: orders.filter(o => o.status === 'pending').length,
@@ -287,373 +294,176 @@ const downloadSlip = async (order) => {
       .filter(o => o.status === 'completed')
       .reduce((sum, order) => sum + (parseFloat(order.service?.price) || 0), 0)
   };
+  const canUpdateOrders = hasPermission(user, "service_orders.update");
 
-  if (loading) {
-    return (
-      <div className="container-fluid py-4">
-          <div className="text-center py-5">
-            <div className="spinner-grow text-primary mb-4" style={{width: '3rem', height: '3rem'}} role="status">
-              <span className="visually-hidden">Loading...</span>
-            </div>
-            <h5 className="text-muted">Loading services orders...</h5>
-          </div>
-        </div>
-    );
-  }
 
   return (
-    <div className="container-fluid">
-      {/* Header */}
-      <div className="row mb-4">
-        <div className="col-12">
-          <div className="d-flex justify-content-between align-items-center">
-            <h1 className="h3 mb-0 text-gray-800">Car Wash Service Orders</h1>
-            <button className="btn btn-success" onClick={fetchOrders}>
-              <i className="fas fa-sync-alt me-2"></i>Refresh
-            </button>
-          </div>
+    <section className="parking-admin-page service-admin-page service-orders-page">
+      <div className="parking-admin-hero">
+        <div>
+          <h1>Car Service Orders</h1>
         </div>
+        <button className="pa-btn pa-btn-ghost" type="button" onClick={fetchOrders} disabled={loading}>
+          <RiRefreshLine /> Refresh
+        </button>
       </div>
 
-      {/* Stats Cards */}
-      <div className="row mb-4">
-        <div className="col-xl-3 col-md-3 mb-4">
-          <div className="card border-left-primary shadow h-100 py-2">
-            <div className="card-body">
-              <div className="row no-gutters align-items-center">
-                <div className="col mr-2">
-                  <div className="text-xs font-weight-bold text-primary text-uppercase mb-1">
-                    Total Orders
-                  </div>
-                  <div className="h5 mb-0 font-weight-bold text-gray-800">
-                    {stats.total_orders}
-                  </div>
-                </div>
-                <div className="col-auto">
-                  <i className="fas fa-clipboard-list fa-2x text-gray-300"></i>
-                </div>
-              </div>
-            </div>
+      <div className="pa-stat-grid">
+        <article className="pa-stat-card">
+          <div>
+            <span>Total Orders</span>
+            <strong>{stats.total_orders}</strong>
           </div>
-        </div>
-
-        <div className="col-xl-3 col-md-3 mb-4">
-          <div className="card border-left-warning shadow h-100 py-2">
-            <div className="card-body">
-              <div className="row no-gutters align-items-center">
-                <div className="col mr-2">
-                  <div className="text-xs font-weight-bold text-warning text-uppercase mb-1">
-                    Pending
-                  </div>
-                  <div className="h5 mb-0 font-weight-bold text-gray-800">
-                    {stats.pending_orders}
-                  </div>
-                </div>
-                <div className="col-auto">
-                  <i className="fas fa-clock fa-2x text-gray-300"></i>
-                </div>
-              </div>
-            </div>
+          <RiCalendarCheckLine />
+        </article>
+        <article className="pa-stat-card">
+          <div>
+            <span>Pending</span>
+            <strong>{stats.pending_orders}</strong>
           </div>
-        </div>
-
-        <div className="col-xl-3 col-md-3 mb-4">
-          <div className="card border-left-info shadow h-100 py-2">
-            <div className="card-body">
-              <div className="row no-gutters align-items-center">
-                <div className="col mr-2">
-                  <div className="text-xs font-weight-bold text-info text-uppercase mb-1">
-                    In Progress
-                  </div>
-                  <div className="h5 mb-0 font-weight-bold text-gray-800">
-                    {stats.in_progress_orders}
-                  </div>
-                </div>
-                <div className="col-auto">
-                  <i className="fas fa-spinner fa-2x text-gray-300"></i>
-                </div>
-              </div>
-            </div>
+          <RiTimeLine />
+        </article>
+        <article className="pa-stat-card">
+          <div>
+            <span>Revenue</span>
+            <strong>BDT {stats.revenue.toFixed(0)}</strong>
           </div>
-        </div>
-
-        <div className="col-xl-3 col-md-3 mb-4">
-          <div className="card border-left-success shadow h-100 py-2">
-            <div className="card-body">
-              <div className="row no-gutters align-items-center">
-                <div className="col mr-2">
-                  <div className="text-xs font-weight-bold text-success text-uppercase mb-1">
-                    Revenue
-                  </div>
-                  <div className="h5 mb-0 font-weight-bold text-gray-800">
-                    BDT {stats.revenue.toFixed(2)}
-                  </div>
-                </div>
-                <div className="col-auto">
-                  <i className="fas fa-dollar-sign fa-2x text-gray-300"></i>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+          <FaBangladeshiTakaSign />
+        </article>
       </div>
 
-      {/* Search & Filter */}
-      <div className="row mb-4">
-        <div className="col-12">
-          <div className="card shadow">
-            <div className="card-body">
-              <div className="row">
-                <div className="col-md-6">
-                  <form onSubmit={handleSearch}>
-                    <div className="input-group">
-                      <input
-                        type="text"
-                        className="form-control"
-                        placeholder="Search..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                      />
-                      <button className="btn btn-primary" type="submit">
-                        <i className="fas fa-search p-2"></i>
-                      </button>
-                    </div>
-                  </form>
-                </div>
-                <div className="col-md-3">
-                  <select
-                    className="form-select"
-                    value={statusFilter}
-                    onChange={(e) => {
-                      setStatusFilter(e.target.value);
-                      setPagination(prev => ({ ...prev, current_page: 1 }));
-                    }}
-                  >
-                    <option value="">All Status</option>
-                    <option value="pending">Pending</option>
-                    <option value="confirmed">Confirmed</option>
-                    <option value="in_progress">In Progress</option>
-                    <option value="completed">Completed</option>
-                    <option value="cancelled">Cancelled</option>
-                  </select>
-                </div>
-                <div className="col-md-3">
-                  <button
-                    className="btn btn-outline-secondary w-100"
-                    onClick={() => {
-                      setSearchTerm("");
-                      setStatusFilter("");
-                      setPagination(prev => ({ ...prev, current_page: 1 }));
-                      fetchOrders();
-                    }}
-                  >
-                    Clear Filters
-                  </button>
-                </div>
-              </div>
-            </div>
+      <AdminFilterBar
+        searchValue={searchTerm}
+        searchPlaceholder="Search customer, service, slip, or notes"
+        onSearchChange={handleSearchChange}
+        filters={[
+          {
+            id: "status",
+            label: "Status",
+            value: statusFilter,
+            onChange: (value) => {
+              setStatusFilter(value);
+              setPagination(prev => ({ ...prev, current_page: 1 }));
+            },
+            options: [
+              { value: "", label: "All Status" },
+              { value: "pending", label: "Pending" },
+              { value: "confirmed", label: "Confirmed" },
+              { value: "in_progress", label: "In Progress" },
+              { value: "completed", label: "Completed" },
+              { value: "cancelled", label: "Cancelled" },
+            ],
+          },
+        ]}
+      />
+
+      <div className="pa-panel">
+        {orders.length === 0 ? (
+          <div className="pa-empty-state">
+            <HiWrenchScrewdriver />
+            <h3>No service orders found</h3>
           </div>
-        </div>
-      </div>
+        ) : (
+          <div className="pa-table-wrap">
+            <table className="pa-table">
+              <thead>
+                <tr>
+                  <th>Order</th>
+                  <th>Customer</th>
+                  <th>Service</th>
+                  <th>Price</th>
+                  <th>Booking Time</th>
+                  <th>Status</th>
+                  <th>Slip</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {orders.map((order) => {
+                  const statusConfig = getStatusBadge(order.status);
+                  const availableActions = getAvailableActions(order);
 
-      {/* Orders Table */}
-      <div className="row">
-        <div className="col-12">
-          <div className="card shadow">
-            <div className="card-body">
-              <div className="d-flex justify-content-between align-items-center mb-3">
-                <h5 className="card-title mb-0">
-                  Service Orders ({pagination.total})
-                </h5>
-                <small className="text-muted">
-                  Showing {orders.length} of {pagination.total} orders
-                </small>
-              </div>
-
-              <div className="table-responsive">
-                <table className="table table-bordered table-hover">
-                  <thead className="table-dark">
-                    <tr>
-                      <th>Order ID</th>
-                      <th>Customer</th>
-                      <th>Service</th>
-                      <th>Price</th>
-                      <th>Booking Time</th>
-                      <th>Status</th>
-                      <th>Slip</th>
-                      <th>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {orders.length > 0 ? (
-                      orders.map((order) => {
-                        const statusConfig = getStatusBadge(order.status);
-                        const availableActions = getAvailableActions(order);
-                        
-                        return (
-                          <tr key={order.id}>
-                            <td>
-                              <strong>#{order.id}</strong>
-                              {order.notes && (
-                                <>
-                                  <br />
-                                  <small className="text-muted" title={order.notes}>
-                                    📝 {order.notes.length > 30 ? order.notes.substring(0, 30) + '...' : order.notes}
-                                  </small>
-                                </>
-                              )}
-                            </td>
-                            <td>
-                              <strong>{order.user?.name || 'N/A'}</strong>
-                              <br />
-                              <small className="text-muted">{order.user?.email || 'N/A'}</small>
-                            </td>
-                            <td>
-                              <strong>{order.service?.name || 'N/A'}</strong>
-                              <br />
-                              <small className="text-muted">{order.service?.description || ''}</small>
-                              <br />
-                              <small className="text-info">{order.service?.duration || ''}</small>
-                            </td>
-                            <td>
-                              <strong className="text-success">
-                                {formatPrice(order.service?.price)}
-                              </strong>
-                            </td>
-                            <td>{formatDate(order.booking_time)}</td>
-                            <td>
-                              <span className={`badge ${statusConfig.class}`}>
-                                {statusConfig.label}
-                              </span>
-                            </td>
-                            <td>
-                              {order.slip_number ? (
-                                <div className="d-flex flex-column align-items-start">
-                                  <strong 
-                                    className="text-primary cursor-pointer text-decoration-underline"
-                                    onClick={() => downloadSlip(order)}
-                                    style={{ cursor: 'pointer' }}
-                                    title="Click to download slip"
-                                  >
-                                    {order.slip_number}
-                                  </strong>
-                                </div>
-                              ) : (
-                                <span className="text-muted">Not generated</span>
-                              )}
-                            </td>
-                            <td>
-                              <div className="btn-group-vertical">
-                                {availableActions.map((action) => (
-                                  <button
-                                    key={action.action}
-                                    className={`btn btn-sm ${action.class} mb-1`}
-                                    onClick={() => {
-                                      if (action.action === 'confirm') {
-                                        confirmBooking(order.id);
-                                      } else if (action.action === 'download') {
-                                        downloadInvoice(order);
-                                      } else {
-                                        updateOrderStatus(order.id, action.action);
-                                      }
-                                    }}
-                                  >
-                                    {action.label}
-                                  </button>
-                                ))}
-                                
-                                {/* Always show download invoice button for completed orders */}
-                                {order.status === 'completed' && (
-                                  <button
-                                    className="btn btn-sm btn-info mb-1"
-                                    onClick={() => downloadInvoice(order)}
-                                    title="Download Invoice"
-                                  >
-                                    <i className="fas fa-file-invoice me-1"></i>Invoice
-                                  </button>
-                                )}
-
-                                {/* Show download slip button for confirmed orders */}
-                                {order.status === 'confirmed' && order.slip_number && (
-                                  <button
-                                    className="btn btn-sm btn-warning mb-1"
-                                    onClick={() => downloadSlip(order)}
-                                    title="Download Booking Slip"
-                                  >
-                                    <i className="fas fa-ticket-alt me-1"></i>Slip
-                                  </button>
-                                )}
-                                
-                                {availableActions.length === 0 && order.status !== 'completed' && order.status !== 'confirmed' && (
-                                  <span className="text-muted small">No actions</span>
-                                )}
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })
-                    ) : (
-                      <tr>
-                        <td colSpan="8" className="text-center py-4">
-                          <div className="text-muted">
-                            <i className="fas fa-inbox fa-3x mb-3"></i>
-                            <p>No service orders found</p>
-                            <button 
-                              className="btn btn-success btn-sm"
-                              onClick={fetchOrders}
+                  return (
+                    <tr key={order.id}>
+                      <td>
+                        <strong>#{order.id}</strong>
+                        {order.notes && <span className="pa-cell-note">{order.notes.length > 30 ? `${order.notes.substring(0, 30)}...` : order.notes}</span>}
+                      </td>
+                      <td>
+                        <strong>{order.user?.name || 'N/A'}</strong>
+                        <span className="pa-cell-note">{order.user?.email || 'N/A'}</span>
+                      </td>
+                      <td>
+                        <strong>{order.service?.name || 'N/A'}</strong>
+                        <span className="pa-cell-note">{order.service?.duration || ''}</span>
+                      </td>
+                      <td className="pa-price">
+                        <span className="pa-price-value">{formatPrice(order.service?.price)}</span>
+                      </td>
+                      <td>{formatDate(order.booking_time)}</td>
+                      <td><span className={`pa-status is-${order.status || 'muted'}`}>{statusConfig.label}</span></td>
+                      <td>
+                        {order.slip_number ? (
+                          <button className="pa-linklike" type="button" onClick={() => downloadSlip(order)}>
+                            <RiDownloadLine /> {order.slip_number}
+                          </button>
+                        ) : (
+                          <span className="pa-cell-note">Not generated</span>
+                        )}
+                      </td>
+                      <td>
+                        <div className="pa-row-actions">
+                          {canUpdateOrders && availableActions.map((action) => (
+                            <button
+                              key={action.action}
+                              className={`pa-mini-btn is-${action.action}`}
+                              type="button"
+                              onClick={() => {
+                                if (action.action === 'confirm') {
+                                  confirmBooking(order.id);
+                                } else if (action.action === 'download') {
+                                  downloadInvoice(order);
+                                } else {
+                                  updateOrderStatus(order.id, action.action);
+                                }
+                              }}
                             >
-                              Try Again
+                              {action.label}
                             </button>
-                          </div>
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-
-              {/* Pagination */}
-              {pagination.last_page > 1 && (
-                <nav className="d-flex justify-content-center mt-4">
-                  <ul className="pagination">
-                    <li className={`page-item ${pagination.current_page === 1 ? 'disabled' : ''}`}>
-                      <button
-                        className="page-link"
-                        onClick={() => handlePageChange(pagination.current_page - 1)}
-                        disabled={pagination.current_page === 1}
-                      >
-                        Previous
-                      </button>
-                    </li>
-                    
-                    {[...Array(pagination.last_page)].map((_, index) => (
-                      <li key={index + 1} className={`page-item ${pagination.current_page === index + 1 ? 'active' : ''}`}>
-                        <button
-                          className="page-link"
-                          onClick={() => handlePageChange(index + 1)}
-                        >
-                          {index + 1}
-                        </button>
-                      </li>
-                    ))}
-                    
-                    <li className={`page-item ${pagination.current_page === pagination.last_page ? 'disabled' : ''}`}>
-                      <button
-                        className="page-link"
-                        onClick={() => handlePageChange(pagination.current_page + 1)}
-                        disabled={pagination.current_page === pagination.last_page}
-                      >
-                        Next
-                      </button>
-                    </li>
-                  </ul>
-                </nav>
-              )}
-            </div>
+                          ))}
+                          {order.status === 'completed' && (
+                            <button className="pa-mini-btn is-download" type="button" onClick={() => downloadInvoice(order)}>
+                              Invoice
+                            </button>
+                          )}
+                          {order.status === 'confirmed' && order.slip_number && (
+                            <button className="pa-mini-btn is-download" type="button" onClick={() => downloadSlip(order)}>
+                              Slip
+                            </button>
+                          )}
+                          {(!canUpdateOrders || availableActions.length === 0) && order.status !== 'completed' && order.status !== 'confirmed' && (
+                            <span className="pa-cell-note">No actions</span>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
-        </div>
+        )}
+
+        <AdminPagination
+          currentPage={pagination.current_page}
+          lastPage={pagination.last_page}
+          total={pagination.total}
+          showing={orders.length}
+          label="service orders"
+          onPageChange={handlePageChange}
+        />
       </div>
-    </div>
+    </section>
   );
 };
 

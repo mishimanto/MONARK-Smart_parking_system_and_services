@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useState } from "react";
+import React, { useContext, useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   FaBars,
@@ -15,44 +15,43 @@ import {
   FaTachometerAlt,
   FaTimes,
   FaTwitter,
-  FaUserEdit,
   FaUserTie,
   FaWrench,
   FaKey,
 } from "react-icons/fa";
+import { RxDashboard } from "react-icons/rx";
+import { LuUser } from "react-icons/lu";
 import { AuthContext } from "../contexts/AuthContext";
-import { API_BASE_URL, clearAuthData, getStoredToken, logoutUser } from "../api/client";
+import { clearAuthData, getStoredToken, logoutUser } from "../api/client";
 import "./css/Navbar.css";
+import { useSiteSettings } from "../contexts/SiteSettingsContext";
+import { resolveAssetUrl } from "../utils/assets";
 
 const navLinks = [
   { label: "Home", to: "/" },
-  { label: "About", to: "/about" },
   { label: "Contact Us", to: "/contact" },
-];
-
-const socialLinks = [
-  { label: "Facebook", href: "#", icon: FaFacebookF },
-  { label: "Twitter", href: "#", icon: FaTwitter },
-  { label: "LinkedIn", href: "#", icon: FaLinkedinIn },
-  { label: "Instagram", href: "#", icon: FaInstagram },
+  { label: "Parking Lots", to: "/all-parkings" },
+  { label: "Services", to: "/services" },
 ];
 
 export default function Navbar() {
   const { user, setUser, loading: authLoading } = useContext(AuthContext);
+  const { settings } = useSiteSettings();
   const navigate = useNavigate();
   const location = useLocation();
-  const [servicesDropdownOpen, setServicesDropdownOpen] = useState(false);
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
-  const [contactInfo, setContactInfo] = useState(null);
 
-  useEffect(() => {
-    fetch(`${API_BASE_URL}/contact-info`)
-      .then((res) => res.json())
-      .then((data) => setContactInfo(data))
-      .catch((err) => console.error("Error fetching contact info:", err));
-  }, []);
+  const socialLinks = useMemo(
+    () => [
+      { label: "Facebook", href: settings.facebook_url, icon: FaFacebookF },
+      { label: "Twitter", href: settings.twitter_url, icon: FaTwitter },
+      { label: "LinkedIn", href: settings.linkedin_url, icon: FaLinkedinIn },
+      { label: "Instagram", href: settings.instagram_url, icon: FaInstagram },
+    ].filter((social) => Boolean(social.href)),
+    [settings.facebook_url, settings.instagram_url, settings.linkedin_url, settings.twitter_url]
+  );
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 40);
@@ -63,7 +62,6 @@ export default function Navbar() {
 
   useEffect(() => {
     setMobileOpen(false);
-    setServicesDropdownOpen(false);
     setUserDropdownOpen(false);
   }, [location.pathname]);
 
@@ -98,26 +96,31 @@ export default function Navbar() {
         ? { label: "Manager Panel", to: "/manager", icon: FaUserTie }
         : user?.role === "mechanic"
           ? { label: "Mechanic Panel", to: "/mechanic/dashboard", icon: FaWrench }
-          : { label: "Dashboard", to: "/dashboard", icon: FaTachometerAlt };
+          : { label: "Dashboard", to: "/dashboard", icon: RxDashboard };
+  const hasPanelAccess = ["admin", "manager", "mechanic"].includes(user?.role);
+
+  const userDisplayName = user?.name || user?.email || "User";
+  const userInitial = userDisplayName.charAt(0).toUpperCase();
+  const userAvatar = resolveAssetUrl(user?.avatar_url || user?.avatar);
 
   return (
     <header className="site-header sticky top-0 z-50 w-full">
       <div className="site-topbar">
         <div className="site-header-inner site-topbar-inner">
           <div className="site-contact-list">
-            {contactInfo ? (
-              <>                
+            {settings.primary_phone || settings.support_email ? (
+              <>
                 <span className="inline-flex items-center gap-2">
                   <FaPhone />
-                  {contactInfo.phone}
+                  {settings.primary_phone}
                 </span>
                 <span className="inline-flex items-center gap-2">
                   <FaEnvelope />
-                  {contactInfo.email}
+                  {settings.support_email}
                 </span>
               </>
             ) : (
-              <span className="text-slate-300">Loading contact info...</span>
+              <span className="text-slate-300">{settings.business_hours}</span>
             )}
           </div>
 
@@ -144,7 +147,11 @@ export default function Navbar() {
       >
         <div className="site-header-inner site-navbar-inner">
           <Link to="/" className="site-brand">
-            <span className="site-brand-name">MONARK</span>
+            {settings.logo ? (
+              <img className="site-brand-logo" src={resolveAssetUrl(settings.logo)} alt={settings.site_name} />
+            ) : (
+              <span className="site-brand-name">{settings.site_name}</span>
+            )}
           </Link>
 
           <button
@@ -163,31 +170,6 @@ export default function Navbar() {
                 {link.label}
               </Link>
             ))}
-
-            <div className="relative">
-              <button
-                type="button"
-                className={`site-nav-link ${servicesDropdownOpen ? "is-active" : ""}`}
-                onClick={() => {
-                  setServicesDropdownOpen((open) => !open);
-                  setUserDropdownOpen(false);
-                }}
-              >
-                Services
-                <FaChevronDown className={`text-xs transition ${servicesDropdownOpen ? "rotate-180" : ""}`} />
-              </button>
-
-              {servicesDropdownOpen && (
-                <div className="site-dropdown absolute left-0 mt-2 w-48 overflow-hidden py-2">
-                  <Link className="site-dropdown-link" to="/all-parkings">
-                    Parking Lots
-                  </Link>
-                  <Link className="site-dropdown-link" to="/services">
-                    Car Services
-                  </Link>
-                </div>
-              )}
-            </div>
           </div>
 
           <div className="site-auth-area hidden lg:flex">
@@ -203,30 +185,42 @@ export default function Navbar() {
                 <button
                   type="button"
                   className="site-user-button"
-                  onClick={() => {
-                    setUserDropdownOpen((open) => !open);
-                    setServicesDropdownOpen(false);
-                  }}
+                  onClick={() => setUserDropdownOpen((open) => !open)}
                 >
-                  {user.name || user.email}
+                  <span className={`site-user-avatar ${userAvatar ? "has-image" : ""}`}>
+                    <span className="site-user-avatar-initial">{userInitial}</span>
+                    {userAvatar && (
+                      <img
+                        src={userAvatar}
+                        alt={userDisplayName}
+                        onError={(event) => {
+                          event.currentTarget.style.display = "none";
+                        }}
+                      />
+                    )}
+                  </span>
+                  <span className="site-user-button-name" title={userDisplayName}>{userDisplayName}</span>
                   <FaChevronDown className={`text-xs transition ${userDropdownOpen ? "rotate-180" : ""}`} />
                 </button>
 
                 {userDropdownOpen && (
                   <div className="site-dropdown site-user-dropdown absolute right-0 mt-3 w-54 overflow-hidden">
-                    
                     <Link className="site-dropdown-link" to={dashboardLink.to}>
                       <dashboardLink.icon className="text-xs" />
                       {dashboardLink.label}
                     </Link>
-                    <Link className="site-dropdown-link" to="/user-profile">
-                      <FaUserEdit />
-                      My Profile
-                    </Link>
-                    <Link className="site-dropdown-link" to="/user-profile">
-                      <FaKey />
-                      Change Password
-                    </Link>
+                    {!hasPanelAccess && (
+                      <>
+                        <Link className="site-dropdown-link" to="/user-profile">
+                          <LuUser />
+                          My Profile
+                        </Link>
+                        <Link className="site-dropdown-link" to="/user-profile">
+                          <FaKey />
+                          Change Password
+                        </Link>
+                      </>
+                    )}
                    
                     <div className="site-dropdown-divider" />
                     <button
@@ -249,7 +243,7 @@ export default function Navbar() {
             <div className="flex flex-col gap-1">
               {navLinks.map((link) => (
                 <Link key={link.to} to={link.to} className={linkClass(link.to)}>
-                  {React.createElement(link.icon, { className: "text-xs" })}
+                  {link.icon && React.createElement(link.icon, { className: "text-xs" })}
                   {link.label}
                 </Link>
               ))}
@@ -268,9 +262,11 @@ export default function Navbar() {
                   <Link className={linkClass(dashboardLink.to)} to={dashboardLink.to}>
                     {dashboardLink.label}
                   </Link>
-                  <Link className={linkClass("/user-profile")} to="/user-profile">
-                    My Profile
-                  </Link>
+                  {!hasPanelAccess && (
+                    <Link className={linkClass("/user-profile")} to="/user-profile">
+                      My Profile
+                    </Link>
+                  )}
                   <button
                     type="button"
                     className="mt-2 rounded-sm bg-red-50 px-4 py-2 text-left text-sm font-bold text-red-600"

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useMemo, useState } from "react";
 import {
   FaBolt,
   FaCamera,
@@ -17,19 +17,32 @@ import {
   FaWifi,
   FaYoutube,
 } from "react-icons/fa";
-import { API_BASE_URL } from "../api/client";
+import { useSiteSettings } from "../contexts/SiteSettingsContext";
+import { resolveAssetUrl } from "../utils/assets";
+
+const featureIcons = [FaShieldAlt, FaCamera, FaWifi, FaBolt];
+const featureColors = ["text-emerald-400", "text-sky-400", "text-amber-400", "text-red-400"];
 
 export default function Footer() {
+  const { settings } = useSiteSettings();
   const [email, setEmail] = useState("");
   const [subscribed, setSubscribed] = useState(false);
-  const [contactInfo, setContactInfo] = useState(null);
 
-  useEffect(() => {
-    fetch(`${API_BASE_URL}/contact-info`)
-      .then((res) => res.json())
-      .then((data) => setContactInfo(data))
-      .catch((err) => console.error("Error fetching contact info:", err));
-  }, []);
+  const footerFeatures = useMemo(
+    () => (Array.isArray(settings.footer_features) && settings.footer_features.length ? settings.footer_features : []),
+    [settings.footer_features]
+  );
+
+  const socialLinks = useMemo(
+    () => [
+      { label: "Facebook", href: settings.facebook_url, icon: FaFacebookF },
+      { label: "Twitter", href: settings.twitter_url, icon: FaTwitter },
+      { label: "LinkedIn", href: settings.linkedin_url, icon: FaLinkedinIn },
+      { label: "Instagram", href: settings.instagram_url, icon: FaInstagram },
+      { label: "YouTube", href: settings.youtube_url, icon: FaYoutube },
+    ].filter((social) => Boolean(social.href)),
+    [settings.facebook_url, settings.instagram_url, settings.linkedin_url, settings.twitter_url, settings.youtube_url]
+  );
 
   const handleSubscribe = (e) => {
     e.preventDefault();
@@ -55,26 +68,35 @@ export default function Footer() {
           <div>
             <div className="flex items-center gap-3">              
               <div>
-                <h3 className="text-2xl font-black tracking-wide">MONARK</h3>                
+                {settings.logo ? (
+                  <img className="footer-brand-logo" src={resolveAssetUrl(settings.logo)} alt={settings.site_name} />
+                ) : (
+                  <h3 className="text-2xl font-black tracking-wide">{settings.site_name}</h3>
+                )}
+                
               </div>
-            </div>
-            <p className="mt-5 max-w-md leading-7 text-slate-300">
-              Your trusted partner for smart parking solutions and premium car care services.             
-            </p>
-
+            </div>            
             <div className="mt-6 grid grid-cols-2 gap-3 text-sm text-slate-200">
-              {[
-                { icon: FaShieldAlt, label: "24/7 Security", color: "text-emerald-400" },
-                { icon: FaCamera, label: "CCTV Coverage", color: "text-sky-400" },
-                { icon: FaWifi, label: "Free WiFi", color: "text-amber-400" },
-                { icon: FaBolt, label: "EV Charging", color: "text-red-400" },
-              ].map((item) => (
-                <div key={item.label} className="flex items-center gap-2 py-2">
-                  {React.createElement(item.icon, { className: item.color })}
-                  <span>{item.label}</span>
-                </div>
-              ))}
+              {footerFeatures.map((label, index) => {
+                const Icon = featureIcons[index % featureIcons.length];
+                return (
+                  <div key={label} className="flex items-center gap-2 py-2">
+                    {React.createElement(Icon, { className: featureColors[index % featureColors.length] })}
+                    <span>{label}</span>
+                  </div>
+                );
+              })}
             </div>
+
+            {socialLinks.length > 0 && (
+              <div className="mt-5 flex flex-wrap gap-3">
+                {socialLinks.map((social) => (
+                  <a key={social.label} href={social.href} className="grid h-9 w-9 place-items-center border border-cyan-300/20 text-cyan-200 transition hover:bg-cyan-300 hover:text-slate-950" aria-label={social.label}>
+                    {React.createElement(social.icon)}
+                  </a>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="grid gap-8 sm:grid-cols-1">
@@ -99,21 +121,21 @@ export default function Footer() {
               <div className="flex items-start gap-3">
                 <FaMapMarkerAlt className="mt-1 text-cyan-300" />
                 <div>
-                  <p className="font-semibold text-white">{contactInfo?.address || "123 Parking Tower, City Center"}</p>
+                  <p className="font-semibold text-white">{settings.address}</p>
                   
                 </div>
               </div>
               <div className="flex items-start gap-3">
                 <FaPhone className="mt-1 text-cyan-300" />
                 <div>
-                  <p className="font-semibold text-white">{contactInfo?.phone || "+880 1XXX-XXXXXX"}</p>
+                  <p className="font-semibold text-white">{settings.primary_phone}</p>
                   
                 </div>
               </div>
               <div className="flex items-start gap-3">
                 <FaEnvelope className="mt-1 text-cyan-300" />
                 <div>
-                  <p className="font-semibold text-white">{contactInfo?.email || "support@monark.test"}</p>
+                  <p className="font-semibold text-white">{settings.support_email}</p>
                   
                 </div>
               </div>
@@ -137,7 +159,7 @@ export default function Footer() {
         </div>        
 
         <div className="mt-10 flex flex-col gap-4 border-t border-white/10 pt-6 text-sm text-slate-300 md:flex-row md:items-center md:justify-between">
-          <p>&copy; {new Date().getFullYear()} MONARK. All rights reserved.</p>
+          <p>&copy; {new Date().getFullYear()} {settings.site_name}. {settings.copyright_text}</p>
           <div className="flex flex-wrap gap-4">
             {["Privacy Policy", "Terms of Service", "Parking Policy", "Safety & Security"].map((item) => (
               <a key={item} href="#" className="transition hover:text-blue-300">

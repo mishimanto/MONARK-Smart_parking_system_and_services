@@ -16,7 +16,11 @@ class PaymentController extends Controller
     public function getPaymentMethods()
     {
         try {
-            $methods = PaymentMethod::all();
+            $methods = PaymentMethod::query()
+                ->where('is_active', true)
+                ->where('type', 'mobile_banking')
+                ->orderBy('name')
+                ->get();
 
             return response()->json([
                 'success' => true,
@@ -33,13 +37,12 @@ class PaymentController extends Controller
     // Initiate topup transaction - SIMPLE VERSION
     public function initiateTopup(Request $request)
     {
-        DB::beginTransaction();
         try {
             Log::info('Initiate topup called', $request->all());
             
             $request->validate([
                 'amount' => 'required|numeric|min:10|max:10000',
-                'payment_method' => 'required|string|in:bkash,nagad,rocket',
+                'payment_method' => 'required|string',
                 'mobile_number' => 'required|string|size:11',
                 'pin' => 'required|string|min:4|max:6'
             ]);
@@ -53,6 +56,21 @@ class PaymentController extends Controller
                     'message' => 'User not authenticated'
                 ], 401);
             }
+
+            $paymentMethod = PaymentMethod::query()
+                ->where('name', $request->payment_method)
+                ->where('is_active', true)
+                ->where('type', 'mobile_banking')
+                ->first();
+
+            if (!$paymentMethod) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Selected payment method is not available.'
+                ], 422);
+            }
+
+            DB::beginTransaction();
             
             Log::info('User authenticated', ['user_id' => $user->id, 'email' => $user->email]);
             
@@ -66,9 +84,9 @@ class PaymentController extends Controller
                 'user_id' => $user->id,
                 'type' => 'topup',
                 'amount' => $request->amount,
-                'payment_method' => $request->payment_method,
+                'payment_method' => $paymentMethod->name,
                 'status' => 'pending',
-                'description' => 'Wallet topup via ' . $request->payment_method,
+                'description' => 'Wallet topup via ' . $paymentMethod->name,
                 'generated_transaction_id' => $generatedTransactionId
             ];
             
@@ -91,13 +109,15 @@ class PaymentController extends Controller
                 'data' => [
                     'transaction_id' => $generatedTransactionId,
                     'amount' => $request->amount,
-                    'payment_method' => $request->payment_method,
+                    'payment_method' => $paymentMethod->name,
                     'status' => 'pending'
                 ]
             ]);
 
         } catch (\Exception $e) {
-            DB::rollBack();
+            if (DB::transactionLevel() > 0) {
+                DB::rollBack();
+            }
             Log::error('Topup initiation error: ' . $e->getMessage());
             return response()->json([
                 'success' => false,

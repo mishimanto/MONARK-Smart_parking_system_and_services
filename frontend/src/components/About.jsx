@@ -2,7 +2,11 @@ import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { FaArrowRight, FaBullseye, FaEye, FaGithub, FaLinkedinIn, FaTwitter } from "react-icons/fa";
 import { getAbout } from "../api/client";
+import { resolveAssetUrl } from "../utils/assets";
+import { getInitialAvatar } from "../utils/avatar";
 import "./css/About.css";
+
+const ABOUT_FALLBACK_IMAGE = "/images/parking-hero.png";
 
 export default function About() {
   const [data, setData] = useState(null);
@@ -13,13 +17,29 @@ export default function About() {
 
   const about = data?.about || {};
   const team = data?.team || [];
-  const founder = team.length > 0 ? team[0] : null;
-  const otherTeamMembers = team.length > 1 ? team.slice(1) : [];
+  const founder = team.find((member) => member.is_founder) || team[0] || null;
+  const otherTeamMembers = founder ? team.filter((member) => member.id !== founder.id) : team;
+  const aboutImage = resolveAssetUrl(about?.image, ABOUT_FALLBACK_IMAGE);
+  const resolveTeamImage = (member) => resolveAssetUrl(member?.image, getInitialAvatar(member?.name));
 
   return (
     <main className="about-page">
       <div className="about-shell">
-        
+        <section className="about-hero">
+          <div>
+            <h1>About Us</h1>            
+          </div>
+          <div className="about-hero-media">
+            <img
+              src={aboutImage}
+              alt={about?.title || "MONARK smart parking"}
+              onError={(event) => {
+                event.currentTarget.src = ABOUT_FALLBACK_IMAGE;
+              }}
+            />
+          </div>
+        </section>
+
         <section className="about-value-grid">
           <div className="about-value-card">
             <span className="about-value-icon">
@@ -40,41 +60,91 @@ export default function About() {
               <p>{about?.vision}</p>
             </div>
           </div>
-        </section>
-
-        <section className="about-stats-grid">
-          {[
-            { value: "24/7", label: "Parking & service support" },
-            { value: "50+", label: "Parking and care locations" },
-            { value: "1K+", label: "Successful customer bookings" },
-            { value: "100%", label: "Digital booking workflow" },
-          ].map((item) => (
-            <div className="about-stat-card" key={item.label}>
-              <strong>{item.value}</strong>
-              <span>{item.label}</span>
-            </div>
-          ))}
-        </section>
-
-        <section className="about-detail-section">
-          <div className="about-detail-copy">
-            <span className="about-kicker">What We Do</span>
-            <h2>Parking and car care, connected in one experience</h2>
-            
-          </div>
-          <div className="about-feature-list">
-            {[
-              "Real-time parking discovery and booking",
-              "Verified service centers and car care options",
-              "Digital records for bookings and service orders",
-              "Customer support for parking and maintenance needs",
-            ].map((feature) => (
-              <div className="about-feature-row" key={feature}>
-                <span />
-                {feature}
+        </section>  
+        <section className="about-people-section">
+          {founder && (
+            <section className="about-founder-card">
+              <div className="about-founder-image">
+                <img
+                  src={resolveTeamImage(founder)}
+                  alt={founder.name}
+                  onError={(event) => {
+                    event.currentTarget.src = getInitialAvatar(founder.name);
+                  }}
+                />
               </div>
-            ))}
-          </div>
+              <div className="about-founder-copy">
+                <span>{founder.position || "Founder & CEO"}</span>
+                <h2>{founder.name}</h2>
+                <p>"{founder.bio}"</p>
+                <div className="about-socials about-founder-socials">
+                  {founder.linkedin_url && (
+                    <a href={founder.linkedin_url} aria-label="LinkedIn">
+                      <FaLinkedinIn />
+                    </a>
+                  )}
+                  {founder.twitter_url && (
+                    <a href={founder.twitter_url} aria-label="Twitter">
+                      <FaTwitter />
+                    </a>
+                  )}
+                  {founder.github_url && (
+                    <a href={founder.github_url} aria-label="GitHub">
+                      <FaGithub />
+                    </a>
+                  )}
+                </div>
+                <div className="about-founder-quote">Driving innovation and excellence in everything we do.</div>
+              </div>
+            </section>
+          )}
+
+          <section className="about-team-section">
+            <div className="about-section-heading">
+              <h2>Meet Our Team</h2>
+            </div>
+
+            {otherTeamMembers.length > 0 ? (
+              <div className="about-team-grid">
+                {otherTeamMembers.map((member, index) => (
+                  <article className="about-team-card" key={member.id}>
+                    <div className="about-team-image">
+                      <img
+                        src={resolveTeamImage(member)}
+                        alt={member.name}
+                        onError={(event) => {
+                          event.currentTarget.src = getInitialAvatar(member.name);
+                        }}
+                      />
+                    </div>
+                    <div className="about-team-content">
+                      <h3>{member.name}</h3>
+                      <p>{member.position}</p>
+                      <div className="about-socials">
+                        {member.linkedin_url && (
+                          <a href={member.linkedin_url} aria-label="LinkedIn">
+                            <FaLinkedinIn />
+                          </a>
+                        )}
+                        {member.twitter_url && (
+                          <a href={member.twitter_url} aria-label="Twitter">
+                            <FaTwitter />
+                          </a>
+                        )}
+                        {member.github_url && (
+                          <a href={member.github_url} aria-label="GitHub">
+                            <FaGithub />
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            ) : (
+              <div className="about-team-empty">Team members will appear here after they are marked active from admin.</div>
+            )}
+          </section>
         </section>
 
         <section className="about-process-section">
@@ -96,54 +166,6 @@ export default function About() {
             ))}
           </div>
         </section>
-
-        {founder && (
-          <section className="about-founder-card">
-            <div className="about-founder-image">
-              <img src={founder.image} alt={founder.name} />
-            </div>
-            <div className="about-founder-copy">
-              <span>Founder & CEO</span>
-              <h2>{founder.name}</h2>
-              <p>"{founder.bio}"</p>
-              <div className="about-founder-quote">Driving innovation and excellence in everything we do.</div>
-            </div>
-          </section>
-        )}
-
-        {otherTeamMembers.length > 0 && (
-          <section className="about-team-section">
-            <div className="about-section-heading">
-              <span className="about-kicker">Team</span>
-              <h2>Meet Our Team</h2>
-            </div>
-
-            <div className="about-team-grid">
-              {otherTeamMembers.map((member) => (
-                <article className="about-team-card" key={member.id}>
-                  <div className="about-team-image">
-                    <img src={member.image} alt={member.name} />
-                  </div>
-                  <div className="about-team-content">
-                    <h3>{member.name}</h3>
-                    <p>{member.position}</p>
-                    <div className="about-socials">
-                      <a href="#" aria-label="LinkedIn">
-                        <FaLinkedinIn />
-                      </a>
-                      <a href="#" aria-label="Twitter">
-                        <FaTwitter />
-                      </a>
-                      <a href="#" aria-label="GitHub">
-                        <FaGithub />
-                      </a>
-                    </div>
-                  </div>
-                </article>
-              ))}
-            </div>
-          </section>
-        )}
 
         <section className="about-cta">
           <div>

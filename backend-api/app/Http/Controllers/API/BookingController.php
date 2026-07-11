@@ -9,6 +9,7 @@ use App\Models\Booking;
 use App\Models\WalletTransaction;
 use App\Models\Slot;
 use App\Models\Parking;
+use App\Support\CacheKeys;
 use Carbon\Carbon;
 use Barryvdh\DomPDF\Facade\Pdf; // ✅ এই line add করুন
 use Illuminate\Support\Facades\Log;
@@ -22,11 +23,38 @@ class BookingController extends Controller
     {
         try {
             $user = $request->user();
-            
-            $bookings = Booking::with(['parking', 'slot'])
+
+            $query = Booking::with(['parking', 'slot'])
                 ->where('user_id', $user->id)
-                ->orderBy('created_at', 'desc')
-                ->get();
+                ->orderBy('created_at', 'desc');
+
+            if ($request->status === 'active') {
+                $query->whereIn('status', ['confirmed', 'active', 'checkout_requested', 'checkout_paid']);
+            }
+
+            if ($request->status === 'history') {
+                $query->whereIn('status', ['completed', 'cancelled']);
+            }
+
+            if ($request->boolean('paginate')) {
+                $perPage = min(max((int) $request->input('per_page', 8), 1), 50);
+                $bookings = $query->paginate($perPage);
+
+                return response()->json([
+                    'success' => true,
+                    'bookings' => $bookings->items(),
+                    'pagination' => [
+                        'current_page' => $bookings->currentPage(),
+                        'last_page' => $bookings->lastPage(),
+                        'per_page' => $bookings->perPage(),
+                        'total' => $bookings->total(),
+                        'from' => $bookings->firstItem(),
+                        'to' => $bookings->lastItem(),
+                    ],
+                ]);
+            }
+
+            $bookings = $query->get();
 
             return response()->json([
                 'success' => true,
@@ -144,8 +172,10 @@ class BookingController extends Controller
             $user->save();
 
             // Update parking available slots
-            $parking->available_slots = $parking->available_slots - 1;
+            $parking->available_slots = max(0, $parking->available_slots - 1);
             $parking->save();
+
+            CacheKeys::bump('public-parkings');
 
             $booking->load(['parking', 'slot']);
 
@@ -213,10 +243,10 @@ class BookingController extends Controller
             }
 
             // Check if booking can be cancelled
-            if ($booking->status === 'cancelled') {
+            if (in_array($booking->status, ['cancelled', 'completed', 'rejected'], true)) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Booking is already cancelled'
+                    'message' => 'This booking cannot be cancelled'
                 ], 422);
             }
 
@@ -247,17 +277,20 @@ class BookingController extends Controller
 
             // Update slot availability
             $slot = Slot::find($booking->slot_id);
+            $slotWasUnavailable = $slot && !$slot->available;
             if ($slot) {
                 $slot->available = true;
                 $slot->save();
             }
 
-            // Update parking available slots
+            // Update parking available slots only when this cancellation actually frees a slot.
             $parking = Parking::find($booking->parking_id);
-            if ($parking) {
-                $parking->available_slots = $parking->available_slots + 1;
+            if ($parking && $slotWasUnavailable) {
+                $parking->available_slots = min($parking->total_slots, $parking->available_slots + 1);
                 $parking->save();
             }
+
+            CacheKeys::bump('public-parkings');
 
             // Process refund if applicable
             if ($refundAmount > 0) {
@@ -480,6 +513,18 @@ class BookingController extends Controller
                     })
                     ->orWhere('id', 'like', "%{$search}%");
                 });
+            }
+
+            if ($request->filled('status')) {
+                $query->where('status', $request->status);
+            }
+
+            if ($request->filled('date_from')) {
+                $query->whereDate('created_at', '>=', $request->date_from);
+            }
+
+            if ($request->filled('date_to')) {
+                $query->whereDate('created_at', '<=', $request->date_to);
             }
             
             $perPage = $request->per_page ?? 15;

@@ -7,11 +7,11 @@ import {
   RiCarLine,
   RiFileList3Line,
   RiRefreshLine,
-  RiServiceLine,
   RiTimeLine,
   RiUser3Line,
-  RiWallet3Line,
 } from "react-icons/ri";
+import { FaBangladeshiTakaSign } from "react-icons/fa6";
+import { HiWrenchScrewdriver } from "react-icons/hi2";
 import { API_BASE_URL } from "../api/client";
 import "./css/AdminDashboard.css";
 
@@ -50,273 +50,29 @@ export default function AdminDashboard() {
 
   const [recentBookings, setRecentBookings] = useState([]);
   const [recentServiceOrders, setRecentServiceOrders] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   const fetchDashboardData = useCallback(async () => {
-    setLoading(true);
     setError(null);
     try {
-      const token = localStorage.getItem('token');
-      
-      const [parkingsRes, bookingsRes, usersRes, slotsRes, servicesRes, serviceOrdersRes] = await Promise.all([
-        axios.get(`${API_BASE_URL}/admin/parkings`, {
-          headers: { Authorization: `Bearer ${token}` }
-        }).catch(err => {
-          console.warn('Parkings API error:', err.message);
-          return { data: { data: [] } };
-        }),
-        
-        axios.get(`${API_BASE_URL}/admin/bookings?per_page=1000`, {
-          headers: { Authorization: `Bearer ${token}` }
-        }).catch(err => {
-          console.warn('Bookings API error:', err.message);
-          return { data: { data: [] } };
-        }),
-        
-        axios.get(`${API_BASE_URL}/admin/users`, {
-          headers: { Authorization: `Bearer ${token}` }
-        }).catch(err => {
-          console.warn('Users API error:', err.message);
-          return { data: { data: [] } };
-        }),
+      const token = localStorage.getItem("token") || sessionStorage.getItem("token");
+      const response = await axios.get(`${API_BASE_URL}/admin/dashboard-stats`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
 
-        axios.get(`${API_BASE_URL}/admin/slots`, {
-          headers: { Authorization: `Bearer ${token}` }
-        }).catch(err => {
-          console.warn('Slots API error:', err.message);
-          return { data: { data: [] } };
-        }),
-
-        // ✅ Services API fetch
-        axios.get(`${API_BASE_URL}/admin/services`, {
-          headers: { Authorization: `Bearer ${token}` }
-        }).catch(err => {
-          console.warn('Services API error:', err.message);
-          return { data: { data: [] } };
-        }),
-
-        // ✅ Service Orders API fetch
-        axios.get(`${API_BASE_URL}/admin/service-orders?per_page=1000`, {
-          headers: { Authorization: `Bearer ${token}` }
-        }).catch(err => {
-          console.warn('Service Orders API error:', err.message);
-          return { data: { data: [] } };
-        })
-      ]);
-
-      // Handle API responses properly
-      const parkings = extractData(parkingsRes.data);
-      const bookings = extractData(bookingsRes.data);
-      const users = extractData(usersRes.data);
-      const slots = extractData(slotsRes.data);
-      const services = extractData(servicesRes.data); // ✅ Services data
-      const serviceOrders = extractData(serviceOrdersRes.data); // ✅ Service Orders data
-
-      console.log('📊 PROCESSED DATA:');
-      console.log('Parkings:', parkings.length);
-      console.log('Bookings:', bookings.length);
-      console.log('Services:', services.length);
-      console.log('Service Orders:', serviceOrders.length);
-
-      // ✅ FIXED: Calculate slots statistics from slots table
-      const totalSlots = slots.length;
-      const availableSlots = slots.filter(slot => slot.available === true || slot.available === 1).length;
-
-      // Calculate parking revenue and statistics
-      const totalParkingRevenue = bookings
-        .filter(booking => booking.status === 'completed')
-        .reduce((sum, booking) => sum + parseFloat(booking.total_price || 0), 0);
-
-      // Calculate service revenue and statistics
-      const totalServiceRevenue = serviceOrders
-        .filter(order => order.status === 'completed')
-        .reduce((sum, order) => sum + parseFloat(order.service?.price || 0), 0);
-
-      const totalCombinedRevenue = totalParkingRevenue + totalServiceRevenue;
-
-      // Calculate parking booking statistics
-      const activeParkingBookings = bookings.filter(booking => 
-        booking.status === 'confirmed' || booking.status === 'active'
-      ).length;
-
-      const completedParkingBookings = bookings.filter(booking => 
-        booking.status === 'completed'
-      ).length;
-
-      const pendingParkingBookings = bookings.filter(booking => 
-        booking.status === 'pending'
-      ).length;
-
-      const cancelledParkingBookings = bookings.filter(booking => 
-        booking.status === 'cancelled'
-      ).length;
-
-      // Calculate service order statistics
-      const completedServiceOrders = serviceOrders.filter(order => 
-        order.status === 'completed'
-      ).length;
-
-      const pendingServiceOrders = serviceOrders.filter(order => 
-        order.status === 'pending'
-      ).length;
-
-      const inProgressServiceOrders = serviceOrders.filter(order => 
-        order.status === 'in_progress'
-      ).length;
-
-      const cancelledServiceOrders = serviceOrders.filter(order => 
-        order.status === 'cancelled'
-      ).length;
-
-      const totalServiceOrdersCount = serviceOrders.length;
-
-      // Active services count
-      const activeServices = services.filter(service => 
-        service.status === 'active' || service.is_active === true || service.is_active === 1
-      ).length;
-
-      // Calculate revenue with date filters
-      const today = new Date().toISOString().split('T')[0];
-      const currentMonth = new Date().getMonth();
-      const currentYear = new Date().getFullYear();
-
-      // Parking revenue by time
-      const todayParkingRevenue = bookings
-        .filter(booking => 
-          booking.status === 'completed' && 
-          booking.created_at && 
-          booking.created_at.includes(today)
-        )
-        .reduce((sum, booking) => sum + parseFloat(booking.total_price || 0), 0);
-
-      const monthlyParkingRevenue = bookings
-        .filter(booking => {
-          if (booking.status !== 'completed' || !booking.created_at) return false;
-          const bookingDate = new Date(booking.created_at);
-          return bookingDate.getMonth() === currentMonth && bookingDate.getFullYear() === currentYear;
-        })
-        .reduce((sum, booking) => sum + parseFloat(booking.total_price || 0), 0);
-
-      const yearlyParkingRevenue = bookings
-        .filter(booking => {
-          if (booking.status !== 'completed' || !booking.created_at) return false;
-          const bookingDate = new Date(booking.created_at);
-          return bookingDate.getFullYear() === currentYear;
-        })
-        .reduce((sum, booking) => sum + parseFloat(booking.total_price || 0), 0);
-
-      // Service revenue by time
-      const todayServiceRevenue = serviceOrders
-        .filter(order => 
-          order.status === 'completed' && 
-          order.created_at && 
-          order.created_at.includes(today)
-        )
-        .reduce((sum, order) => sum + parseFloat(order.service?.price || 0), 0);
-
-      const monthlyServiceRevenue = serviceOrders
-        .filter(order => {
-          if (order.status !== 'completed' || !order.created_at) return false;
-          const orderDate = new Date(order.created_at);
-          return orderDate.getMonth() === currentMonth && orderDate.getFullYear() === currentYear;
-        })
-        .reduce((sum, order) => sum + parseFloat(order.service?.price || 0), 0);
-
-      // Recent bookings
-      const recentBookingsData = [...bookings]
-        .sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0))
-        .slice(0, 5)
-        .map(booking => ({
-          ...booking,
-          user: booking.user || { name: 'N/A' },
-          parking: booking.parking || { name: 'N/A' },
-          slot: booking.slot || { slot_code: 'N/A' },
-          type: 'parking' // Type identifier
-        }));
-
-      // Recent service orders
-      const recentServiceOrdersData = [...serviceOrders]
-        .sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0))
-        .slice(0, 5)
-        .map(order => ({
-          ...order,
-          user: order.user || { name: 'N/A' },
-          service: order.service || { name: 'N/A', price: 0 },
-          type: 'service' // Type identifier
-        }));
-
-      // Set stats
-      const newStats = {
-        // Parking Stats
-        totalParkings: parkings.length,
-        totalSlots,
-        availableSlots,
-        activeBookings: activeParkingBookings,
-        totalUsers: users.length,
-        todayRevenue: todayParkingRevenue,
-        monthlyRevenue: monthlyParkingRevenue,
-        totalRevenue: totalParkingRevenue,
-        yearlyRevenue: yearlyParkingRevenue,
-        completedBookings: completedParkingBookings,
-        pendingBookings: pendingParkingBookings,
-        cancelledBookings: cancelledParkingBookings,
-        
-        // Service Stats
-        totalServices: services.length,
-        activeServices,
-        totalServiceOrders: totalServiceOrdersCount,
-        completedServiceOrders,
-        pendingServiceOrders,
-        inProgressServiceOrders,
-        cancelledServiceOrders,
-        totalServiceRevenue,
-        todayServiceRevenue,
-        monthlyServiceRevenue,
-        
-        // Combined Stats
-        totalCombinedRevenue,
-        totalCombinedBookings: bookings.length + serviceOrders.length
-      };
-
-      console.log('FINAL STATS:', newStats);
-
-      setStats(newStats);
-      setRecentBookings(recentBookingsData);
-      setRecentServiceOrders(recentServiceOrdersData);
+      const dashboard = response.data?.data || {};
+      setStats((previous) => ({
+        ...previous,
+        ...dashboard,
+      }));
+      setRecentBookings(dashboard.recentBookings || []);
+      setRecentServiceOrders(dashboard.recentServiceOrders || []);
 
     } catch (error) {
-      console.error('❌ Error fetching dashboard data:', error);
-      setError('Failed to load dashboard data. Please try again.');
-    } finally {
-      setLoading(false);
+      console.error("Error fetching dashboard data:", error);
+      setError("Failed to load dashboard data. Please try again.");
     }
   }, []);
-
-  // Helper function to extract data from different API response structures
-  const extractData = (response) => {
-    if (!response) return [];
-    
-    // Case 1: Direct array
-    if (Array.isArray(response.data)) {
-      return response.data;
-    }
-    // Case 2: Paginated response { data: { data: [], ... } }
-    else if (response.data && Array.isArray(response.data.data)) {
-      return response.data.data;
-    }
-    // Case 3: Nested structure
-    else if (response.data && typeof response.data === 'object') {
-      // Try to find array in nested structure
-      for (let key in response.data) {
-        if (Array.isArray(response.data[key])) {
-          return response.data[key];
-        }
-      }
-    }
-    // Case 4: Fallback
-    return [];
-  };
 
   useEffect(() => {
     fetchDashboardData();
@@ -331,17 +87,6 @@ export default function AdminDashboard() {
   };
 
   const normalizeStatus = (status = "unknown") => status.replaceAll("_", " ");
-
-  if (loading) {
-    return (
-      <div className="admin-dashboard-page">
-        <div className="admin-dashboard-loading">
-          <span />
-          <p>Loading dashboard data...</p>
-        </div>
-      </div>
-    );
-  }
 
   if (error) {
     return (
@@ -359,7 +104,7 @@ export default function AdminDashboard() {
   }
 
   const heroStats = [
-    { label: "Total Revenue", value: formatCurrency(stats.totalCombinedRevenue), note: "Parking + services", icon: RiWallet3Line },
+    { label: "Total Revenue", value: formatCurrency(stats.totalCombinedRevenue), note: "Parking + services", icon: FaBangladeshiTakaSign },
     { label: "Total Bookings", value: stats.totalCombinedBookings, note: "All booking types", icon: RiCalendarCheckLine },
     { label: "Registered Users", value: stats.totalUsers, note: "Customer accounts", icon: RiUser3Line },
   ];
@@ -368,9 +113,9 @@ export default function AdminDashboard() {
     { label: "Parking Lots", value: stats.totalParkings, note: "Locations", icon: RiCarLine },
     { label: "Total Slots", value: stats.totalSlots, note: `${stats.availableSlots} available`, icon: RiFileList3Line },
     { label: "Active Parking", value: stats.activeBookings, note: "Running bookings", icon: RiTimeLine },
-    { label: "Parking Revenue", value: formatCurrency(stats.totalRevenue), note: "Completed bookings", icon: RiWallet3Line },
-    { label: "Service Orders", value: stats.totalServiceOrders, note: `${stats.inProgressServiceOrders} in progress`, icon: RiServiceLine },
-    { label: "Service Revenue", value: formatCurrency(stats.totalServiceRevenue), note: "Completed services", icon: RiWallet3Line },
+    { label: "Parking Revenue", value: formatCurrency(stats.totalRevenue), note: "Completed bookings", icon: FaBangladeshiTakaSign },
+    { label: "Service Orders", value: stats.totalServiceOrders, note: `${stats.inProgressServiceOrders} in progress`, icon: HiWrenchScrewdriver },
+    { label: "Service Revenue", value: formatCurrency(stats.totalServiceRevenue), note: "Completed services", icon: FaBangladeshiTakaSign },
   ];
 
   const parkingBreakdown = [
@@ -411,7 +156,7 @@ export default function AdminDashboard() {
               <div>
                 <span>{item.label}</span>
                 <strong>{item.value}</strong>
-                <p>{item.note}</p>
+                
               </div>
               <Icon />
             </article>
@@ -427,7 +172,7 @@ export default function AdminDashboard() {
               <Icon />
               <span>{item.label}</span>
               <strong>{item.value}</strong>
-              <p>{item.note}</p>
+              
             </article>
           );
         })}
@@ -437,12 +182,10 @@ export default function AdminDashboard() {
         <div className="admin-dashboard-panel">
           <div className="admin-panel-head">
             <div>
-              <span>Parking</span>
               <h3>Recent Parking Bookings</h3>
             </div>
             <Link to="/admin/bookings">
               View All
-              <RiArrowRightLine />
             </Link>
           </div>
           <div className="admin-record-list">
@@ -475,12 +218,10 @@ export default function AdminDashboard() {
         <div className="admin-dashboard-panel">
           <div className="admin-panel-head">
             <div>
-              <span>Services</span>
               <h3>Recent Service Orders</h3>
             </div>
             <Link to="/admin/service-orders">
               View All
-              <RiArrowRightLine />
             </Link>
           </div>
           <div className="admin-record-list">
@@ -514,7 +255,6 @@ export default function AdminDashboard() {
       <section className="admin-dashboard-panel">
         <div className="admin-panel-head">
           <div>
-            <span>Finance</span>
             <h3>Revenue Summary</h3>
           </div>
         </div>

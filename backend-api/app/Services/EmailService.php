@@ -13,7 +13,7 @@ class EmailService
     public function sendVerificationCode($user, $transaction, $verificationCode)
     {
         try {
-            Mail::to($user->email)->queue(new VerificationCodeMail($user, $transaction, $verificationCode));
+            Mail::to($user->email)->send(new VerificationCodeMail($user, $transaction, $verificationCode));
             return true;
         } catch (\Exception $e) {
             \Log::error('Email sending failed: ' . $e->getMessage());

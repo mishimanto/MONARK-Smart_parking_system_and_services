@@ -1,14 +1,12 @@
 <?php
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
-use App\Models\Contact;
+use App\Http\Controllers\SiteSettingController;
 
 class LayoutController extends Controller
 {
     public function getContact()
     {
-        $contact = Contact::first();
-        return response()->json($contact);
+        return app(SiteSettingController::class)->contactInfo();
     }
 }

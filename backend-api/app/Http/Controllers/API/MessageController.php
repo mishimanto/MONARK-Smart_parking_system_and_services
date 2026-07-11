@@ -9,19 +9,36 @@ use Illuminate\Support\Facades\Log;
 
 class MessageController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
         try {
-            Log::info('Fetching messages from database');
-            
-            $messages = Message::orderBy('created_at', 'desc')->get();
-            
-            Log::info('Messages fetched successfully', ['count' => $messages->count()]);
+            $query = Message::query();
+
+            if ($request->filled('q')) {
+                $search = $request->q;
+                $query->where(function ($q) use ($search) {
+                    $q->where('name', 'like', "%{$search}%")
+                        ->orWhere('email', 'like', "%{$search}%")
+                        ->orWhere('subject', 'like', "%{$search}%")
+                        ->orWhere('message', 'like', "%{$search}%");
+                });
+            }
+
+            if ($request->filled('status')) {
+                $query->where('status', $request->status);
+            }
+
+            $perPage = $request->get('per_page', 10);
+            $messages = $query->orderBy('created_at', 'desc')->paginate($perPage);
             
             return response()->json([
                 'success' => true,
                 'data' => $messages,
-                'count' => $messages->count()
+                'stats' => [
+                    'unread' => Message::where('status', 'unread')->count(),
+                    'read' => Message::where('status', 'read')->count(),
+                    'replied' => Message::where('status', 'replied')->count(),
+                ],
             ]);
             
         } catch (\Exception $e) {

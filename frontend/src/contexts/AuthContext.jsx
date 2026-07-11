@@ -4,8 +4,20 @@ import { clearAuthData, getMe, getStoredToken } from "../api/client";
 // eslint-disable-next-line react-refresh/only-export-components
 export const AuthContext = createContext();
 
+const getStoredUser = () => {
+  const savedUser = localStorage.getItem("user") || sessionStorage.getItem("user");
+  if (!savedUser) return null;
+
+  try {
+    return JSON.parse(savedUser);
+  } catch (error) {
+    console.error("Failed to parse stored user:", error);
+    return null;
+  }
+};
+
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState(() => getStoredUser());
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -23,6 +35,11 @@ export function AuthProvider({ children }) {
         return;
       }
 
+      const cachedUser = getStoredUser();
+      if (cachedUser && mounted) {
+        setUser(cachedUser);
+      }
+
       try {
         const response = await getMe();
         const currentUser = response?.user;
@@ -37,8 +54,10 @@ export function AuthProvider({ children }) {
         }
       } catch (error) {
         console.error("Auth verification failed:", error);
-        clearAuthData();
-        if (mounted) {
+        if (error.response?.status === 401) {
+          clearAuthData();
+        }
+        if (mounted && error.response?.status === 401) {
           setUser(null);
         }
       } finally {

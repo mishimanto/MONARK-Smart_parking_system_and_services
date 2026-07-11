@@ -1,6 +1,27 @@
-import { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
-import { API_BASE_URL } from "../../api/client";
+import { useCallback, useEffect, useState } from "react";
+import Swal from "sweetalert2";
+import {
+  RiCloseLine,
+  RiDeleteBin6Line,
+  RiEyeLine,
+  RiInboxLine,
+  RiMailLine,
+  RiMailOpenLine,
+  RiMailUnreadLine,
+  RiRefreshLine,
+  RiReplyLine,
+  RiTimeLine,
+  RiUser3Line,
+} from "react-icons/ri";
+import { API_BASE_URL, bulkDeleteAdminResource } from "../../api/client";
+import AdminBulkActions from "./components/AdminBulkActions";
+import AdminFilterBar from "./components/AdminFilterBar";
+import AdminPagination from "./components/AdminPagination";
+import { showErrorToast, showSuccessToast } from "../../utils/toast";
+import useBulkSelection from "./utils/useBulkSelection";
+import "./css/ParkingAdmin.css";
+import "./css/ServiceAdmin.css";
+import "./css/CommunicationsAdmin.css";
 
 export default function Messages() {
   const [messages, setMessages] = useState([]);
@@ -8,26 +29,43 @@ export default function Messages() {
   const [error, setError] = useState("");
   const [selectedMessage, setSelectedMessage] = useState(null);
   const [showModal, setShowModal] = useState(false);
+  const [isModalClosing, setIsModalClosing] = useState(false);
+  const [q, setQ] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pagination, setPagination] = useState({
+    current_page: 1,
+    last_page: 1,
+    per_page: 10,
+    total: 0,
+  });
+  const [stats, setStats] = useState({ unread: 0, read: 0, replied: 0 });
+  const bulk = useBulkSelection(messages);
 
-  // Fetch messages from database
-  const fetchMessages = async () => {
+  const getHeaders = useCallback(() => {
+    const token = localStorage.getItem("token") || sessionStorage.getItem("token");
+    const headers = {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    };
+    if (token) headers.Authorization = `Bearer ${token}`;
+    return headers;
+  }, []);
+
+  const fetchMessages = useCallback(async () => {
     try {
       setLoading(true);
       setError("");
-      
-      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-      const headers = {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      };
+      const params = new URLSearchParams({
+        page: String(currentPage),
+        per_page: "10",
+      });
+      if (q) params.set("q", q);
+      if (statusFilter) params.set("status", statusFilter);
 
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
-
-      const response = await fetch(`${API_BASE_URL}/messages`, {
-        method: 'GET',
-        headers: headers,
+      const response = await fetch(`${API_BASE_URL}/messages?${params.toString()}`, {
+        method: "GET",
+        headers: getHeaders(),
       });
 
       if (!response.ok) {
@@ -36,406 +74,367 @@ export default function Messages() {
       }
 
       const data = await response.json();
-      
-      // Check if response has success property
-      if (data.success && Array.isArray(data.data)) {
+      if (data.success && Array.isArray(data.data?.data)) {
+        setMessages(data.data.data);
+        setPagination({
+          current_page: data.data.current_page || 1,
+          last_page: data.data.last_page || 1,
+          per_page: data.data.per_page || 10,
+          total: data.data.total || 0,
+        });
+        setStats(data.stats || { unread: 0, read: 0, replied: 0 });
+      } else if (data.success && Array.isArray(data.data)) {
         setMessages(data.data);
+        setPagination({
+          current_page: 1,
+          last_page: 1,
+          per_page: data.data.length,
+          total: data.data.length,
+        });
       } else if (Array.isArray(data)) {
         setMessages(data);
+        setPagination({
+          current_page: 1,
+          last_page: 1,
+          per_page: data.length,
+          total: data.length,
+        });
       } else {
         setMessages([]);
       }
-      
     } catch (err) {
-      console.error('Fetch messages error:', err);
+      console.error("Fetch messages error:", err);
       setError(err.message || "Failed to load messages");
       setMessages([]);
     } finally {
       setLoading(false);
     }
-  };
+  }, [currentPage, getHeaders, q, statusFilter]);
 
   useEffect(() => {
     fetchMessages();
+  }, [fetchMessages]);
+
+  const closeModal = useCallback(() => {
+    setIsModalClosing(true);
+    window.setTimeout(() => {
+      setShowModal(false);
+      setSelectedMessage(null);
+      setIsModalClosing(false);
+    }, 180);
   }, []);
 
-  // Mark message as read
+  useEffect(() => {
+    if (!showModal) return undefined;
+
+    const handleEscape = (event) => {
+      if (event.key === "Escape") closeModal();
+    };
+
+    window.addEventListener("keydown", handleEscape);
+    return () => window.removeEventListener("keydown", handleEscape);
+  }, [closeModal, showModal]);
+
   const markAsRead = async (messageId) => {
     try {
-      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-      const headers = {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      };
-
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
-
       const response = await fetch(`${API_BASE_URL}/messages/${messageId}/read`, {
-        method: 'PUT',
-        headers: headers,
+        method: "PUT",
+        headers: getHeaders(),
       });
 
       if (response.ok) {
-        // Update messages list
-        const updatedMessages = messages.map(msg => 
-          msg.id === messageId ? { ...msg, status: 'read' } : msg
-        );
-        setMessages(updatedMessages);
-        
-        // Update selected message if it's the same
+        setMessages((items) => items.map((msg) => (
+          msg.id === messageId ? { ...msg, status: "read" } : msg
+        )));
+        setStats((prev) => ({
+          ...prev,
+          unread: Math.max(0, prev.unread - 1),
+          read: prev.read + 1,
+        }));
         if (selectedMessage?.id === messageId) {
-          setSelectedMessage(prev => ({ ...prev, status: 'read' }));
+          setSelectedMessage((prev) => ({ ...prev, status: "read" }));
         }
       }
     } catch (err) {
-      console.error('Error marking message as read:', err);
+      console.error("Error marking message as read:", err);
     }
   };
 
-  // Delete message
   const deleteMessage = async (messageId) => {
-    if (!window.confirm('Are you sure you want to delete this message?')) {
-      return;
-    }
+    const result = await Swal.fire({
+      title: "Delete message?",
+      text: "This message will be removed permanently.",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonText: "Yes, delete",
+      cancelButtonText: "Cancel",
+      confirmButtonColor: "#dc2626",
+      cancelButtonColor: "#64748b",
+    });
+
+    if (!result.isConfirmed) return;
 
     try {
-      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-      const headers = {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      };
-
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
-
       const response = await fetch(`${API_BASE_URL}/messages/${messageId}`, {
-        method: 'DELETE',
-        headers: headers,
+        method: "DELETE",
+        headers: getHeaders(),
       });
 
-      if (response.ok) {
-        // Remove from messages list
-        const updatedMessages = messages.filter(msg => msg.id !== messageId);
-        setMessages(updatedMessages);
-        
-        // Close modal if deleted message was selected
-        if (selectedMessage?.id === messageId) {
-          setSelectedMessage(null);
-          setShowModal(false);
-        }
-        
-        alert('Message deleted successfully!');
-      } else {
-        throw new Error('Failed to delete message');
+      if (!response.ok) throw new Error("Failed to delete message");
+
+      fetchMessages();
+      if (selectedMessage?.id === messageId) {
+        setSelectedMessage(null);
+        setShowModal(false);
       }
+      showSuccessToast("Deleted", "Message removed successfully.");
     } catch (err) {
-      console.error('Error deleting message:', err);
-      alert('Failed to delete message. Please try again.');
+      console.error("Error deleting message:", err);
+      showErrorToast("Failed to delete message", "Please try again.");
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    const result = await Swal.fire({
+      title: `Delete ${bulk.selectedCount} messages?`,
+      text: "Selected messages will be removed permanently.",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonText: "Yes, delete selected",
+      cancelButtonText: "Cancel",
+      confirmButtonColor: "#991b1b",
+      cancelButtonColor: "#64748b",
+    });
+
+    if (!result.isConfirmed) return;
+
+    try {
+      const response = await bulkDeleteAdminResource("messages", bulk.selectedNumericIds);
+      if (selectedMessage && bulk.selectedIds.includes(String(selectedMessage.id))) {
+        setSelectedMessage(null);
+        setShowModal(false);
+      }
+      bulk.clearSelection();
+      showSuccessToast("Bulk delete complete", response.message);
+      fetchMessages();
+    } catch (err) {
+      console.error("Bulk delete messages error:", err);
+      showErrorToast("Bulk delete failed", err.response?.data?.message || "Please try again.");
     }
   };
 
   const handleMessageClick = (message) => {
     setSelectedMessage(message);
+    setIsModalClosing(false);
     setShowModal(true);
-    
-    // Auto mark as read when clicking on unread message
-    if (message.status === 'unread') {
-      markAsRead(message.id);
-    }
+    if (message.status === "unread") markAsRead(message.id);
   };
 
-  const closeModal = () => {
-    setShowModal(false);
-    setSelectedMessage(null);
-  };
-
-  const getStatusBadge = (status) => {
-    const statusConfig = {
-      unread: { class: 'bg-warning text-dark', text: 'Unread' },
-      read: { class: 'bg-success text-white', text: 'Read' },
-      replied: { class: 'bg-info text-white', text: 'Replied' }
-    };
-    
-    const config = statusConfig[status] || statusConfig.unread;
-    return <span className={`badge ${config.class}`}>{config.text}</span>;
-  };
-
-  const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
+  const formatDate = (dateString) =>
+    new Date(dateString).toLocaleString("en-BD", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
     });
+
+  const getStatusClass = (status) => {
+    if (status === "unread") return "is-pending";
+    if (status === "read") return "is-live";
+    if (status === "replied") return "is-confirmed";
+    return "is-soft";
   };
 
-  if (loading) {
-    return (
-      <div className="container-fluid py-4">
-        <div className="d-flex justify-content-center align-items-center" style={{ height: '400px' }}>
-          <div className="text-center">
-            <div className="spinner-border text-primary mb-3" role="status">
-              <span className="visually-hidden">Loading...</span>
-            </div>
-            <p>Loading messages...</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const statCards = [
+    { label: "Total Messages", value: pagination.total, icon: <RiInboxLine /> },
+    { label: "Unread Messages", value: stats.unread, icon: <RiMailUnreadLine /> },
+    { label: "Read Messages", value: stats.read, icon: <RiMailOpenLine /> },
+    { label: "Replied Messages", value: stats.replied, icon: <RiReplyLine /> },
+  ];
 
   return (
-    <div className="container-fluid py-4">
-      {/* Header */}
-      <div className="d-flex justify-content-between align-items-center mb-4">
+    <section className="parking-admin-page service-admin-page communications-admin-page">
+      <div className="parking-admin-hero">
         <div>
-          <h1 className="h3 mb-1 text-gray-800">Messages</h1>
+          <h1>Messages</h1>
         </div>
-        <div className="d-flex gap-2">
-          <button 
-            className="btn btn-outline-info"
-            onClick={fetchMessages}
-            disabled={loading}
-          >
-            <i className="fas fa-sync-alt me-2"></i>
-            Refresh
-          </button>
-          <Link to="/admin" className="btn btn-outline-secondary">
-            <i className="fas fa-arrow-left me-2"></i>
-            Back to Dashboard
-          </Link>
-        </div>
+        <button className="pa-btn pa-btn-ghost" type="button" onClick={fetchMessages} disabled={loading}>
+          <RiRefreshLine /> Refresh
+        </button>
       </div>
 
-      {/* Error Alert */}
       {error && (
-        <div className="alert alert-danger alert-dismissible fade show" role="alert">
-          <strong>Error!</strong> {error}
-          <button type="button" className="btn-close" onClick={() => setError("")}></button>
+        <div className="comm-alert">
+          <strong>Error</strong>
+          <span>{error}</span>
+          <button type="button" onClick={() => setError("")}>Dismiss</button>
         </div>
       )}
 
-      {/* Statistics */}
-      <div className="row mb-4">
-        <div className="col-md-4">
-          <div className="card bg-primary text-white">
-            <div className="card-body">
-              <div className="d-flex justify-content-between">
-                <div>
-                  <h3>{messages.filter(m => m.status === 'unread').length}</h3>
-                  <p className="mb-0">Unread Messages</p>
-                </div>
-                <div className="align-self-center">
-                  <i className="fas fa-envelope fa-2x"></i>
-                </div>
-              </div>
+      <div className="pa-stat-grid">
+        {statCards.map((card) => (
+          <article className="pa-stat-card" key={card.label}>
+            <div>
+              <span>{card.label}</span>
+              <strong>{card.value}</strong>
             </div>
-          </div>
-        </div>
-        <div className="col-md-4">
-          <div className="card bg-success text-white">
-            <div className="card-body">
-              <div className="d-flex justify-content-between">
-                <div>
-                  <h3>{messages.filter(m => m.status === 'read').length}</h3>
-                  <p className="mb-0">Read Messages</p>
-                </div>
-                <div className="align-self-center">
-                  <i className="fas fa-envelope-open fa-2x"></i>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div className="col-md-4">
-          <div className="card bg-info text-white">
-            <div className="card-body">
-              <div className="d-flex justify-content-between">
-                <div>
-                  <h3>{messages.filter(m => m.status === 'replied').length}</h3>
-                  <p className="mb-0">Replied Messages</p>
-                </div>
-                <div className="align-self-center">
-                  <i className="fas fa-reply fa-2x"></i>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+            {card.icon}
+          </article>
+        ))}
       </div>
 
-      {/* Messages Table */}
-      <div className="card shadow">
-        <div className="card-header bg-primary text-white py-3">
-          <h5 className="card-title mb-0">
-            <i className="fas fa-inbox me-2"></i>
-            Messages ({messages.length})
-          </h5>
-        </div>
-        <div className="card-body p-0">
-          {messages.length === 0 ? (
-            <div className="text-center py-5">
-              <i className="fas fa-inbox fa-3x text-muted mb-3"></i>
-              <p className="text-muted">No messages found</p>
-            </div>
-          ) : (
-            <div className="table-responsive">
-              <table className="table table-hover table-striped mb-0">
-                <thead className="table-light">
-                  <tr>
-                    <th>Status</th>
-                    <th>Name</th>
-                    <th>Email</th>
-                    <th>Subject</th>
-                    <th>Date</th>
-                    <th>Actions</th>
+      <AdminFilterBar
+        searchValue={q}
+        searchPlaceholder="Search by name, email, subject, or message"
+        onSearchChange={(value) => {
+          setQ(value);
+          setCurrentPage(1);
+        }}
+        filters={[
+          {
+            id: "status",
+            label: "Status",
+            value: statusFilter,
+            onChange: (value) => {
+              setStatusFilter(value);
+              setCurrentPage(1);
+            },
+            options: [
+              { value: "", label: "All Status" },
+              { value: "unread", label: "Unread" },
+              { value: "read", label: "Read" },
+              { value: "replied", label: "Replied" },
+            ],
+          },
+        ]}
+      />
+
+      <div className="pa-panel">
+        {loading ? (
+          <div className="pa-empty-state">Loading messages...</div>
+        ) : messages.length === 0 ? (
+          <div className="pa-empty-state">
+            <RiInboxLine />
+            <h3>No messages found</h3>
+            <p>Customer messages will appear here.</p>
+          </div>
+        ) : (
+          <>
+          <AdminBulkActions
+            selectedCount={bulk.selectedCount}
+            totalCount={messages.length}
+            label="messages"
+            onToggleAll={bulk.toggleAllVisible}
+            onClear={bulk.clearSelection}
+            onDelete={handleBulkDelete}
+          />
+          <div className="pa-table-wrap">
+            <table className="pa-table comm-table">
+              <thead>
+                <tr>
+                  <th className="pa-select-col">Select</th>
+                  <th>Status</th>
+                  <th>Name</th>
+                  <th>Email</th>
+                  <th>Subject</th>
+                  <th>Date</th>
+                  <th className="comm-actions-col">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {messages.map((message) => (
+                  <tr key={message.id} className={message.status === "unread" ? "comm-unread-row" : ""}>
+                    <td className="pa-select-col">
+                      <label className="pa-row-check" title={`Select message from ${message.name}`}>
+                        <input type="checkbox" checked={bulk.isSelected(message.id)} onChange={() => bulk.toggleSelection(message.id)} />
+                      </label>
+                    </td>
+                    <td className="text-center">
+                      <span className={`pa-status ${getStatusClass(message.status)}`}>
+                        {message.status || "unread"}
+                      </span>
+                    </td>
+                    <td>
+                      <span className="pa-icon-text"><RiUser3Line /> {message.name}</span>
+                    </td>
+                    <td>
+                      <span className="pa-icon-text"><RiMailLine /> {message.email}</span>
+                    </td>
+                    <td className="text-center"><strong>{message.subject || "No Subject"}</strong></td>
+                    <td className="text-center">
+                      <span className="pa-icon-text"><RiTimeLine /> {formatDate(message.created_at)}</span>
+                    </td>
+                    <td className="text-center">
+                      <div className="pa-row-actions comm-row-actions">
+                        <button className="pa-icon-btn" type="button" onClick={() => handleMessageClick(message)} title="View Message">
+                          <RiEyeLine />
+                        </button>
+                        <button className="pa-icon-btn is-danger" type="button" onClick={() => deleteMessage(message.id)} title="Delete Message">
+                          <RiDeleteBin6Line />
+                        </button>
+                      </div>
+                    </td>
                   </tr>
-                </thead>
-                <tbody>
-                  {messages.map((message) => (
-                    <tr 
-                      key={message.id}
-                      className={message.status === 'unread' ? 'fw-bold' : ''}
-                      style={{ cursor: 'pointer' }}
-                      onClick={() => handleMessageClick(message)}
-                    >
-                      <td>
-                        {getStatusBadge(message.status)}
-                      </td>
-                      <td>
-                        <div className="d-flex align-items-center">
-                          <i className="fas fa-user-circle text-muted me-2"></i>
-                          {message.name}
-                        </div>
-                      </td>
-                      <td>
-                        <i className="fas fa-envelope text-muted me-2"></i>
-                        {message.email}
-                      </td>
-                      <td>
-                        {message.subject || 'No Subject'}
-                      </td>
-                      <td>
-                        <small className="text-muted">
-                          {formatDate(message.created_at)}
-                        </small>
-                      </td>
-                      <td>
-                        <div className="btn-group btn-group-sm">
-                          <button
-                            className="btn btn-outline-primary"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleMessageClick(message);
-                            }}
-                            title="View Message"
-                          >
-                            <i className="fas fa-eye"></i>
-                          </button>
-                          <button
-                            className="btn btn-outline-danger"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              deleteMessage(message.id);
-                            }}
-                            title="Delete Message"
-                          >
-                            <i className="fas fa-trash"></i>
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
+                ))}
+              </tbody>
+            </table>
+            <AdminPagination
+              currentPage={pagination.current_page}
+              lastPage={pagination.last_page}
+              perPage={pagination.per_page}
+              total={pagination.total}
+              showing={messages.length}
+              label="messages"
+              onPageChange={setCurrentPage}
+            />
+          </div>
+          </>
+        )}
       </div>
 
-      
-
-      {/* Message Modal */}
       {showModal && selectedMessage && (
-        <div className="modal fade show" style={{ display: 'block', backgroundColor: 'rgba(0,0,0,0.5)' }}>
-          <div className="modal-dialog modal-lg">
-            <div className="modal-content">
-              <div className="modal-header bg-success text-white">
-                <h5 className="modal-title">
-                  <i className="fas fa-envelope me-2"></i>
-                  Message Details
-                </h5>
-                <button type="button" className="btn-close btn-close-white" onClick={closeModal}></button>
+        <div
+          className={`comm-modal-backdrop ${isModalClosing ? "is-closing" : ""}`}
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) closeModal();
+          }}
+        >
+          <div
+            className={`comm-modal ${isModalClosing ? "is-closing" : ""}`}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="message-modal-title"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <div className="comm-modal-head">
+              <div>
+                <span className="parking-admin-kicker">Message Details</span>
+                <h3 id="message-modal-title">{selectedMessage.subject || "No Subject"}</h3>
               </div>
-              <div className="modal-body">
-                <div className="row mb-3">
-                  <div className="col-md-6">
-                    <strong>From:</strong>
-                    <p className="mb-1">{selectedMessage.name}</p>
-                    <p className="text-muted">
-                      <i className="fas fa-envelope me-1"></i>
-                      {selectedMessage.email}
-                    </p>
-                  </div>
-                  <div className="col-md-6 text-end">
-                    <strong>Received:</strong>
-                    <p className="text-muted">
-                      <i className="fas fa-clock me-1"></i>
-                      {formatDate(selectedMessage.created_at)}
-                    </p>
-                    <div>
-                      {getStatusBadge(selectedMessage.status)}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mb-3">
-                  <strong>Subject:</strong>
-                  <p className="mb-0 p-2 bg-light rounded">{selectedMessage.subject || 'No Subject'}</p>
-                </div>
-
-                <div className="mb-3">
-                  <strong>Message:</strong>
-                  <div className="border rounded p-3 mt-2 bg-light" style={{ minHeight: '150px' }}>
-                    {selectedMessage.message}
-                  </div>
-                </div>
+              <button className="comm-modal-close" type="button" onClick={closeModal} aria-label="Close message details">
+                <RiCloseLine />
+              </button>
+            </div>
+            <div className="comm-modal-meta">
+              <div className="comm-meta-card">
+                <span><RiUser3Line /> From</span>
+                <strong>{selectedMessage.name}</strong>
+                <p>{selectedMessage.email}</p>
               </div>
-              {/* <div className="modal-footer">
-                <button
-                  className="btn btn-primary"
-                  onClick={() => handleEmailReply(selectedMessage)}
-                >
-                  <i className="fas fa-reply me-2"></i>
-                  Reply via Email
-                </button>
-                
-                {selectedMessage.status === 'read' && (
-                  <button
-                    className="btn btn-info"
-                    onClick={() => markAsReplied(selectedMessage.id)}
-                  >
-                    <i className="fas fa-check me-2"></i>
-                    Mark as Replied
-                  </button>
-                )}
-                
-                <button
-                  className="btn btn-outline-secondary"
-                  onClick={closeModal}
-                >
-                  <i className="fas fa-times me-2"></i>
-                  Close
-                </button>
-              </div> */}
+              <div className="comm-meta-card">
+                <span><RiTimeLine /> Received</span>
+                <strong>{formatDate(selectedMessage.created_at)}</strong>
+                <p className={`pa-status ${getStatusClass(selectedMessage.status)}`}>{selectedMessage.status}</p>
+              </div>
+            </div>
+            <div className="comm-message-body">
+              <span>Message</span>
+              <p>{selectedMessage.message}</p>
             </div>
           </div>
         </div>
       )}
-    </div>
+    </section>
   );
 }

@@ -41,7 +41,6 @@ api.interceptors.response.use(
     }
 );
 
-// Auth endpoints - IMPORTANT: Remove try-catch so errors propagate
 export const registerUser = async (formData) => {
     const response = await api.post('/register', formData);
     return response.data;
@@ -54,6 +53,10 @@ export const loginUser = async (form) => {
     });
     return response.data;
   } catch (error) {
+    if (error.response?.status === 429) {
+      return { message: "Too many login attempts. Please wait and try again." };
+    }
+
     if (error.response && error.response.status === 401) {
       return { message: "Invalid email or password" };
     }
@@ -66,17 +69,37 @@ export const loginUser = async (form) => {
   }
 };
 
-
-
-// client.js - getMe function update
-export const getMe = async () => {
-    try {
-        const response = await api.get('/me');
-        return response.data;
-    } catch (error) {
-        console.error("Error in getMe:", error);
-        throw error; // Re-throw the error so component can handle it
+export const verifyAdminTwoFactor = async (payload) => {
+  try {
+    const response = await api.post('/login/admin-2fa', payload, {
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }
+    });
+    return response.data;
+  } catch (error) {
+    if (error.response?.status === 429) {
+      return { message: "Too many verification attempts. Please wait and try again." };
     }
+
+    if (error.response?.data?.message) {
+      return { message: error.response.data.message };
+    }
+
+    return { message: "Network or server error. Please try again." };
+  }
+};
+
+let pendingMeRequest = null;
+
+export const getMe = async () => {
+    if (!pendingMeRequest) {
+        pendingMeRequest = api.get('/me')
+            .then((response) => response.data)
+            .finally(() => {
+                pendingMeRequest = null;
+            });
+    }
+
+    return pendingMeRequest;
 };
 
 export const logoutUser = async () => {
@@ -88,10 +111,7 @@ export const logoutUser = async () => {
 export const walletAPI = {
     getBalance: async () => {
         try {
-            /*console.log("🟡 client.js: Calling wallet/balance API...");*/
             const response = await api.get('/wallet/balance');
-            /*console.log("🟢 client.js: API Response:", response);
-            console.log("🟢 client.js: Response Data:", response.data);*/
             return response.data;
         } catch (error) {
             console.error("🔴 client.js: API Error:", error);
@@ -100,9 +120,7 @@ export const walletAPI = {
     },
     topup: async (data) => {
         try {
-            /*console.log("🟡 client.js: Calling wallet/topup API...");*/
             const response = await api.post('/wallet/topup', data);
-            /*console.log("🟢 client.js: Topup Response:", response.data);*/
             return response.data;
         } catch (error) {
             console.error("🔴 client.js: Topup Error:", error);
@@ -122,7 +140,7 @@ export const walletAPI = {
 
 export const bookingAPI = {
     createWithWallet: (data) => api.post('/bookings/wallet', data),
-    getAll: () => api.get('/bookings'), // This should match your Laravel route
+    getAll: (params = {}) => api.get('/bookings', { params }), // This should match your Laravel route
     getActive: () => api.get('/bookings/active'),
     cancel: (id) => api.put(`/bookings/${id}/cancel`),
     getHistory: () => api.get('/bookings/history'),
@@ -152,32 +170,110 @@ export const adminAPI = {
   rejectCheckout: (checkoutId) => 
     api.post(`/checkouts/${checkoutId}/reject`),
 
-    // নতুন method যোগ করুন
   getCheckoutStats: () => 
     api.get('/admin/checkouts/stats')
 };
 
-// In your api/client.js
 export const serviceOrdersAPI = {
   // Get user's service orders
-  getUserOrders: () => api.get('/service-orders'),
+  getUserOrders: (params = {}) => api.get('/service-orders', { params }),
   
   // Book a new service
   bookService: (data) => api.post('/service-orders', data),
-  
-  // Update service order status (for admin)
-  updateStatus: (id, status) => api.put(`/service-orders/${id}/status`, { status })
+
+  cancelOrder: (id, reason = "") => api.put(`/service-orders/${id}/cancel`, { reason })
 };
 export const getAbout = () => axios.get(`${API_BASE_URL}/about`);
 export const getContact = () => axios.get(`${API_BASE_URL}/contact`);
 export const sendMessage = (data) => axios.post(`${API_BASE_URL}/messages`, data);
 
+export const getSiteSettings = async () => {
+  const response = await api.get('/site-settings');
+  return response.data;
+};
 
-// Better: Use axios for all services functions
-// api/client.js এ
-export const getAdminServices = async (page = 1, perPage = 10) => {
+export const getAdminSiteSettings = async () => {
+  const response = await api.get('/admin/site-settings');
+  return response.data;
+};
+
+export const updateAdminSiteSettings = async (settingsData) => {
+  const response = await api.put('/admin/site-settings', settingsData);
+  return response.data;
+};
+
+export const uploadSiteSettingMedia = async (formData) => {
+  const response = await api.post('/admin/site-settings/upload', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+    timeout: 30000,
+  });
+  return response.data;
+};
+
+export const getAdminTeamMembers = async (page = 1, perPage = 10, filters = {}) => {
+  const response = await api.get('/admin/team-members', {
+    params: {
+      page,
+      per_page: perPage,
+      q: filters.q || undefined,
+      status: filters.status || undefined,
+      role: filters.role || undefined,
+    },
+  });
+  return response.data;
+};
+
+export const getAdminTeamMember = async (id) => {
+  const response = await api.get(`/admin/team-members/${id}`);
+  return response.data;
+};
+
+export const createTeamMember = async (memberData) => {
+  const response = await api.post('/admin/team-members', memberData);
+  return response.data;
+};
+
+export const updateTeamMember = async (id, memberData) => {
+  const response = await api.put(`/admin/team-members/${id}`, memberData);
+  return response.data;
+};
+
+export const deleteTeamMember = async (id) => {
+  const response = await api.delete(`/admin/team-members/${id}`);
+  return response.data;
+};
+
+export const toggleTeamMemberStatus = async (id) => {
+  const response = await api.patch(`/admin/team-members/${id}/status`);
+  return response.data;
+};
+
+export const uploadTeamMemberImage = async (formData) => {
+  const response = await api.post('/admin/team-members/upload-image', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+    timeout: 30000,
+  });
+  return response.data;
+};
+
+export const bulkDeleteAdminResource = async (resource, ids) => {
+  const response = await api.post('/admin/bulk-delete', { resource, ids });
+  return response.data;
+};
+
+export const getAdminServices = async (page = 1, perPage = 10, filters = {}) => {
   const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-  const response = await axios.get(`${API_BASE_URL}/admin/services?page=${page}&per_page=${perPage}`, {
+  const response = await axios.get(`${API_BASE_URL}/admin/services`, {
+    params: {
+      page,
+      per_page: perPage,
+      q: filters.q || undefined,
+      status: filters.status || undefined,
+    },
     headers: {
       'Authorization': `Bearer ${token}`,
       'Content-Type': 'application/json'
@@ -208,9 +304,7 @@ export const updateService = async (id, serviceData) => {
 
 export const deleteService = async (id) => {
   try {
-    console.log('🟡 Deleting service:', id);
     const response = await api.delete(`/admin/services/${id}`);
-    console.log('🟢 Delete response:', response.data);
     return response.data;
   } catch (error) {
     console.error('🔴 Delete service error:', error);
@@ -238,32 +332,18 @@ export const toggleServiceStatus = async (id) => {
   }
 };
 
-// Service Image Upload
-// client.js - Fix the uploadServiceImage function
 export const uploadServiceImage = async (formData) => {
   try {
-    console.log('🟡 Uploading service image...', formData);
-    
-    // Check if formData is properly constructed
-    if (formData instanceof FormData) {
-      for (let pair of formData.entries()) {
-        console.log('🔵 FormData:', pair[0], pair[1]);
-      }
-    }
-
     const response = await api.post('/admin/upload-service-image', formData, {
       headers: {
         'Content-Type': 'multipart/form-data'
       },
       timeout: 30000 // 30 seconds timeout
     });
-    
-    console.log('🟢 Service image upload response:', response.data);
     return response.data;
   } catch (error) {
     console.error('🔴 Service image upload error:', error);
     
-    // Detailed error logging
     if (error.response) {
       console.error('🔴 Server response:', error.response.data);
       console.error('🔴 Status:', error.response.status);
@@ -286,37 +366,31 @@ export const uploadServiceImage = async (formData) => {
 
 // Get user profile
 export const getProfile = async () => {
-  const token = localStorage.getItem('token');
-  const response = await axios.get(`${API_BASE_URL}/profile`, {
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json'
-    }
-  });
+  const response = await api.get('/profile');
   return response.data;
 };
 
 // Update profile
 export const updateProfile = async (profileData) => {
-  const token = localStorage.getItem('token');
-  const response = await axios.put(`${API_BASE_URL}/profile`, profileData, {
+  const response = await api.put('/profile', profileData);
+  return response.data;
+};
+
+export const uploadProfileAvatar = async (file) => {
+  const formData = new FormData();
+  formData.append('avatar', file);
+
+  const response = await api.post('/profile/avatar', formData, {
     headers: {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json'
-    }
+      'Content-Type': 'multipart/form-data',
+    },
   });
   return response.data;
 };
 
 // Change password
 export const changePassword = async (passwordData) => {
-  const token = localStorage.getItem('token');
-  const response = await axios.put(`${API_BASE_URL}/change-password`, passwordData, {
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json'
-    }
-  });
+  const response = await api.put('/change-password', passwordData);
   return response.data;
 };
 

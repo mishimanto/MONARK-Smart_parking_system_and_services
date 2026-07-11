@@ -1,0 +1,846 @@
+.mechanic-page {
+  min-height: 100vh;
+  background:
+    linear-gradient(180deg, rgba(0, 247, 255, 0.06), transparent 340px),
+    linear-gradient(135deg, rgba(255, 77, 125, 0.045), transparent 420px),
+    #080d22;
+  color: #ffffff;
+  padding: 40px 20px;
+}
+
+.mechanic-shell {
+  width: min(1180px, 100%);
+  margin: 0 auto;
+}
+
+.mechanic-topbar {
+  position: relative;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+  border: 1px solid rgba(0, 247, 255, 0.17);
+  border-radius: 4px;
+  background: rgba(16, 22, 45, 0.96);
+  box-shadow: 0 22px 54px rgba(0, 0, 0, 0.28);
+  padding: 12px 14px;
+}
+
+.mechanic-topbar > div:first-child {
+  display: grid;
+  gap: 4px;
+}
+
+.mechanic-topbar > div:first-child span,
+.mechanic-modal-head span,
+.mechanic-profile-form label > span {
+  color: #00f7ff;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.mechanic-topbar > div:first-child strong {
+  color: #ffffff;
+  font-size: 18px;
+  font-weight: 900;
+}
+
+.mechanic-profile-menu {
+  position: relative;
+}
+
+.mechanic-profile-trigger {
+  display: flex;
+  min-width: 226px;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid rgba(0, 247, 255, 0.2);
+  border-radius: 4px;
+  background: #0b1127;
+  color: #ffffff;
+  padding: 8px;
+  text-align: left;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.mechanic-profile-trigger:hover,
+.mechanic-profile-trigger[aria-expanded="true"] {
+  border-color: rgba(0, 247, 255, 0.55);
+  background: rgba(0, 247, 255, 0.08);
+}
+
+.mechanic-profile-trigger > span:nth-child(2) {
+  display: grid;
+  min-width: 0;
+  flex: 1;
+  gap: 2px;
+}
+
+.mechanic-profile-trigger strong,
+.mechanic-profile-summary strong {
+  overflow: hidden;
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 900;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mechanic-profile-trigger small,
+.mechanic-profile-summary small {
+  overflow: hidden;
+  color: #a8b6cf;
+  font-size: 12px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-transform: capitalize;
+}
+
+.mechanic-avatar {
+  display: inline-flex;
+  width: 42px;
+  height: 42px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border: 1px solid rgba(0, 247, 255, 0.38);
+  border-radius: 50%;
+  background: #00d4df;
+  color: #020617;
+  font-size: 17px;
+  font-weight: 900;
+}
+
+.mechanic-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.mechanic-avatar.large {
+  width: 58px;
+  height: 58px;
+  font-size: 22px;
+}
+
+.mechanic-avatar.xlarge {
+  width: 104px;
+  height: 104px;
+  font-size: 42px;
+}
+
+.mechanic-profile-dropdown {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  border: 1px solid rgba(0, 247, 255, 0.18);
+  border-radius: 4px;
+  background: #10162d;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.42);
+  padding: 10px;
+}
+
+.mechanic-profile-summary {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 12px;
+  border-bottom: 1px solid rgba(0, 247, 255, 0.12);
+  margin-bottom: 8px;
+  padding: 8px 8px 14px;
+}
+
+.mechanic-profile-summary > div {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+}
+
+.mechanic-profile-dropdown button {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 10px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: #d8f7ff;
+  padding: 10px;
+  font-size: 13px;
+  font-weight: 900;
+  text-align: left;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.mechanic-profile-dropdown button:hover {
+  background: rgba(0, 247, 255, 0.09);
+  color: #ffffff;
+}
+
+.mechanic-profile-dropdown button.is-danger {
+  color: #fecaca;
+}
+
+.mechanic-profile-dropdown button.is-danger:hover {
+  background: rgba(239, 68, 68, 0.11);
+}
+
+.mechanic-hero {
+  display: block;
+  margin-bottom: 20px;
+}
+
+.mechanic-hero-copy,
+.mechanic-stat-card,
+.mechanic-orders-panel {
+  border: 1px solid rgba(0, 247, 255, 0.17);
+  border-radius: 4px;
+  background: #10162d;
+  box-shadow: 0 22px 54px rgba(0, 0, 0, 0.28);
+}
+
+.mechanic-hero-copy {
+  position: relative;
+  display: flex;
+  min-height: 142px;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  overflow: hidden;
+  padding: clamp(22px, 4vw, 34px);
+}
+
+.mechanic-hero-copy::before {
+  position: absolute;
+  inset: 0;
+  border-left: 4px solid #00f7ff;
+  background: linear-gradient(120deg, rgba(0, 247, 255, 0.1), transparent 46%);
+  content: "";
+  pointer-events: none;
+}
+
+.mechanic-hero-copy > * {
+  position: relative;
+  z-index: 1;
+}
+
+.mechanic-hero-copy span,
+.mechanic-stat-card span,
+.mechanic-panel-head span,
+.mechanic-order-id span,
+.mechanic-service-info span,
+.mechanic-date-box span {
+  color: #00f7ff;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.mechanic-hero h1 {
+  margin: 12px 0;
+  color: #ffffff;
+  font-size: clamp(30px, 4vw, 52px);
+  font-weight: 900;
+  line-height: 1.02;
+}
+
+.mechanic-hero p {
+  max-width: 760px;
+  margin: 0;
+  color: #a8b6cf;
+  font-size: 15.5px;
+  line-height: 1.75;
+}
+
+.mechanic-hero-refresh,
+.mechanic-clear,
+.mechanic-status-box button,
+.mechanic-actions button,
+.mechanic-pagination button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 1px solid #00d4df;
+  border-radius: 4px;
+  background: #00d4df;
+  color: #020617;
+  padding: 12px 16px;
+  font-size: 13px;
+  font-weight: 900;
+  line-height: 1;
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, transform 0.2s ease;
+}
+
+.mechanic-hero-refresh:hover,
+.mechanic-clear:hover,
+.mechanic-status-box button:hover,
+.mechanic-actions button:hover,
+.mechanic-pagination button:hover {
+  background: #00f7ff;
+  border-color: #00f7ff;
+  transform: translateY(-2px);
+}
+
+.mechanic-hero-refresh:disabled,
+.mechanic-actions button:disabled,
+.mechanic-pagination button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+  transform: none;
+}
+
+.mechanic-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.mechanic-stat-card {
+  position: relative;
+  display: flex;
+  min-height: 132px;
+  align-items: center;
+  justify-content: space-between;
+  overflow: hidden;
+  padding: 22px;
+}
+
+.mechanic-stat-card::before {
+  position: absolute;
+  right: -44px;
+  bottom: -52px;
+  width: 128px;
+  height: 128px;
+  border-radius: 50%;
+  background: rgba(0, 247, 255, 0.12);
+  content: "";
+}
+
+.mechanic-stat-card strong {
+  display: block;
+  margin-top: 10px;
+  color: #ffffff;
+  font-size: clamp(28px, 4vw, 40px);
+  font-weight: 900;
+  line-height: 1;
+}
+
+.mechanic-stat-icon {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  width: 58px;
+  height: 58px;
+  place-items: center;
+  border: 1px solid rgba(0, 247, 255, 0.26);
+  border-radius: 4px;
+  background: rgba(0, 247, 255, 0.08);
+  color: #00f7ff;
+  font-size: 27px;
+}
+
+.mechanic-stat-card.is-amber::before {
+  background: rgba(245, 158, 11, 0.16);
+}
+
+.mechanic-stat-card.is-green::before {
+  background: rgba(34, 197, 94, 0.14);
+}
+
+.mechanic-stat-card.is-blue::before {
+  background: rgba(59, 130, 246, 0.14);
+}
+
+.mechanic-toolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 220px auto;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.mechanic-search {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid rgba(0, 247, 255, 0.18);
+  border-radius: 4px;
+  background: #0b1127;
+  padding: 0 14px;
+}
+
+.mechanic-search svg {
+  color: #00f7ff;
+  font-size: 20px;
+}
+
+.mechanic-search input,
+.mechanic-toolbar select {
+  width: 100%;
+  min-height: 46px;
+  border: 1px solid rgba(0, 247, 255, 0.18);
+  border-radius: 4px;
+  background: #0b1127;
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 800;
+  outline: 0;
+}
+
+.mechanic-search input {
+  border: 0;
+  background: transparent;
+}
+
+.mechanic-search input::placeholder {
+  color: #6f7d98;
+}
+
+.mechanic-toolbar select {
+  padding: 0 12px;
+}
+
+.mechanic-clear {
+  min-height: 46px;
+  background: transparent;
+  color: #c9faff;
+}
+
+.mechanic-orders-panel {
+  padding: 20px;
+}
+
+.mechanic-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid rgba(0, 247, 255, 0.12);
+  padding-bottom: 16px;
+}
+
+.mechanic-panel-head h2 {
+  margin: 6px 0 0;
+  color: #ffffff;
+  font-size: clamp(22px, 3vw, 30px);
+  font-weight: 900;
+}
+
+.mechanic-panel-head small {
+  color: #a8b6cf;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.mechanic-order-list {
+  display: grid;
+  gap: 12px;
+}
+
+.mechanic-order-card {
+  display: grid;
+  grid-template-columns: 90px minmax(210px, 1.2fr) minmax(220px, 1fr) minmax(190px, 0.9fr) 130px 122px;
+  gap: 14px;
+  align-items: center;
+  border: 1px solid rgba(0, 247, 255, 0.12);
+  border-radius: 4px;
+  background: rgba(11, 17, 39, 0.82);
+  padding: 16px;
+}
+
+.mechanic-order-id strong,
+.mechanic-service-info strong,
+.mechanic-date-box strong {
+  display: block;
+  margin-top: 5px;
+  color: #ffffff;
+  font-size: 15px;
+  font-weight: 900;
+  line-height: 1.35;
+}
+
+.mechanic-order-id strong {
+  font-size: 20px;
+}
+
+.mechanic-order-main {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 12px;
+}
+
+.mechanic-user-icon {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid rgba(0, 247, 255, 0.24);
+  border-radius: 4px;
+  background: rgba(0, 247, 255, 0.08);
+  color: #00f7ff;
+}
+
+.mechanic-order-main h3 {
+  overflow: hidden;
+  margin: 0;
+  color: #ffffff;
+  font-size: 16px;
+  font-weight: 900;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mechanic-order-main p,
+.mechanic-service-info p {
+  overflow: hidden;
+  margin: 4px 0 0;
+  color: #a8b6cf;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.45;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mechanic-status-box {
+  display: grid;
+  justify-items: start;
+  gap: 8px;
+}
+
+.mechanic-status {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid rgba(0, 247, 255, 0.24);
+  border-radius: 4px;
+  background: rgba(0, 247, 255, 0.1);
+  color: #9ffbff;
+  padding: 7px 10px;
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 1;
+  text-transform: capitalize;
+}
+
+.mechanic-status.is-in_progress {
+  border-color: rgba(245, 158, 11, 0.28);
+  background: rgba(245, 158, 11, 0.12);
+  color: #fde68a;
+}
+
+.mechanic-status-box button {
+  min-height: 36px;
+  padding: 9px 11px;
+}
+
+.mechanic-status-box small {
+  color: #7d8aa5;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.mechanic-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.mechanic-actions button {
+  width: 100%;
+  min-height: 42px;
+}
+
+.mechanic-actions button.is-complete {
+  border-color: #22c55e;
+  background: #22c55e;
+  color: #04130a;
+}
+
+.mechanic-actions button.is-complete:hover {
+  border-color: #4ade80;
+  background: #4ade80;
+}
+
+.mechanic-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.mechanic-pagination span {
+  display: inline-flex;
+  min-height: 42px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(0, 247, 255, 0.22);
+  border-radius: 4px;
+  background: #0b1127;
+  color: #ffffff;
+  padding: 0 16px;
+  font-weight: 900;
+}
+
+.mechanic-state,
+.mechanic-empty {
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(0, 247, 255, 0.12);
+  border-radius: 4px;
+  background: rgba(11, 17, 39, 0.82);
+  color: #a8b6cf;
+  font-weight: 900;
+}
+
+.mechanic-empty {
+  text-align: center;
+  padding: 32px;
+}
+
+.mechanic-empty svg {
+  color: #00f7ff;
+  font-size: 54px;
+}
+
+.mechanic-empty h3 {
+  margin: 12px 0 6px;
+  color: #ffffff;
+  font-size: 22px;
+  font-weight: 900;
+}
+
+.mechanic-empty p {
+  margin: 0;
+  color: #a8b6cf;
+}
+
+.mechanic-modal {
+  position: fixed;
+  z-index: 1000;
+  display: grid;
+  inset: 0;
+  place-items: center;
+  background: rgba(3, 7, 18, 0.72);
+  padding: 20px;
+}
+
+.mechanic-modal-card {
+  width: min(520px, 100%);
+  border: 1px solid rgba(0, 247, 255, 0.2);
+  border-radius: 4px;
+  background: #10162d;
+  box-shadow: 0 30px 90px rgba(0, 0, 0, 0.54);
+  padding: 20px;
+}
+
+.mechanic-modal-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 18px;
+  border-bottom: 1px solid rgba(0, 247, 255, 0.12);
+  padding-bottom: 16px;
+}
+
+.mechanic-modal-head h2 {
+  margin: 4px 0 0;
+  color: #ffffff;
+  font-size: 24px;
+  font-weight: 900;
+}
+
+.mechanic-modal-head button {
+  display: inline-flex;
+  width: 36px;
+  height: 36px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(0, 247, 255, 0.2);
+  border-radius: 4px;
+  background: #0b1127;
+  color: #d8f7ff;
+}
+
+.mechanic-profile-form {
+  display: grid;
+  gap: 14px;
+}
+
+.mechanic-profile-photo {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  border: 1px solid rgba(0, 247, 255, 0.12);
+  border-radius: 4px;
+  background: rgba(11, 17, 39, 0.72);
+  padding: 14px;
+}
+
+.mechanic-profile-photo label {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 1px solid rgba(0, 247, 255, 0.24);
+  border-radius: 4px;
+  background: rgba(0, 247, 255, 0.08);
+  color: #c9faff;
+  padding: 10px 12px;
+  font-size: 13px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.mechanic-profile-photo input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+
+.mechanic-profile-form label {
+  display: grid;
+  gap: 8px;
+}
+
+.mechanic-profile-form label > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.mechanic-profile-form input {
+  width: 100%;
+  min-height: 46px;
+  border: 1px solid rgba(0, 247, 255, 0.18);
+  border-radius: 4px;
+  background: #0b1127;
+  color: #ffffff;
+  padding: 0 12px;
+  font-size: 14px;
+  font-weight: 800;
+  outline: 0;
+}
+
+.mechanic-profile-form input:focus {
+  border-color: rgba(0, 247, 255, 0.54);
+}
+
+.mechanic-profile-form input:disabled {
+  color: #7d8aa5;
+  cursor: not-allowed;
+}
+
+.mechanic-profile-form > button {
+  display: inline-flex;
+  min-height: 46px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid #00d4df;
+  border-radius: 4px;
+  background: #00d4df;
+  color: #020617;
+  padding: 12px 16px;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.mechanic-profile-form > button:hover {
+  border-color: #00f7ff;
+  background: #00f7ff;
+}
+
+.mechanic-profile-form > button:disabled {
+  opacity: 0.6;
+}
+
+.is-spinning {
+  animation: mechanic-spin 0.9s linear infinite;
+}
+
+@keyframes mechanic-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 1100px) {
+  .mechanic-stat-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .mechanic-order-card {
+    grid-template-columns: 80px minmax(220px, 1fr) minmax(220px, 1fr);
+  }
+
+  .mechanic-status-box,
+  .mechanic-actions {
+    justify-content: start;
+  }
+}
+
+@media (max-width: 760px) {
+  .mechanic-page {
+    padding: 24px 14px;
+  }
+
+  .mechanic-topbar,
+  .mechanic-toolbar,
+  .mechanic-stat-grid,
+  .mechanic-order-card {
+    grid-template-columns: 1fr;
+  }
+
+  .mechanic-topbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .mechanic-profile-trigger,
+  .mechanic-profile-dropdown {
+    width: 100%;
+  }
+
+  .mechanic-profile-dropdown {
+    position: static;
+    margin-top: 10px;
+  }
+
+  .mechanic-hero-copy {
+    flex-direction: column;
+  }
+
+  .mechanic-hero-refresh {
+    width: max-content;
+  }
+
+  .mechanic-panel-head {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .mechanic-actions {
+    justify-content: stretch;
+  }
+
+  .mechanic-pagination {
+    flex-wrap: wrap;
+  }
+}

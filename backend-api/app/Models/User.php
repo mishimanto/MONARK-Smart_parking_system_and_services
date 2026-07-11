@@ -14,6 +14,7 @@ class User extends Authenticatable
     protected $fillable = [
         'name',
         'email',
+        'avatar',
         'password',
         'role',
         'wallet_balance',
@@ -41,5 +42,29 @@ class User extends Authenticatable
     public function bookings()
     {
         return $this->hasMany(Booking::class);
+    }
+
+    public function assignedServiceOrders()
+    {
+        return $this->hasMany(ServiceOrder::class, 'assigned_mechanic_id');
+    }
+
+    public function roleModel()
+    {
+        return $this->belongsTo(Role::class, 'role', 'slug');
+    }
+
+    public function permissions(): array
+    {
+        if ($this->role === 'admin') {
+            return ['*'];
+        }
+
+        $role = $this->roleModel;
+        if (!$role?->is_active) {
+            return [];
+        }
+
+        return is_array($role?->permissions) ? $role->permissions : [];
     }
 }

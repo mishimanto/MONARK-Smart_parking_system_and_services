@@ -3,18 +3,22 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\User;
+use App\Models\Role;
 use App\Models\Parking; 
 use App\Models\Slot;
 use App\Models\Booking;
 use App\Models\WalletTransaction; 
 use App\Models\Service; 
 use App\Models\ServiceOrder; 
+use App\Services\ImageUploadService;
+use App\Support\CacheKeys;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Validation\Rule;
 use App\Mail\TicketMail;
 use App\Mail\TransactionApprovedMail;
 use App\Mail\TransactionRejectedMail;
@@ -56,8 +60,25 @@ class AdminController extends Controller
                 $search = $request->q;
                 $query->where(function($q) use ($search) {
                     $q->where('name', 'like', "%{$search}%")
-                      ->orWhere('email', 'like', "%{$search}%");
+                      ->orWhere('email', 'like', "%{$search}%")
+                      ->orWhere('id', 'like', "%{$search}%");
                 });
+            }
+
+            if ($request->filled('status')) {
+                if ($request->status === 'active') {
+                    $query->where('is_blocked', false);
+                } elseif ($request->status === 'blocked') {
+                    $query->where('is_blocked', true);
+                }
+            }
+
+            if ($request->filled('email_status')) {
+                if ($request->email_status === 'verified') {
+                    $query->whereNotNull('email_verified_at');
+                } elseif ($request->email_status === 'unverified') {
+                    $query->whereNull('email_verified_at');
+                }
             }
             
             $query->withCount('bookings');
@@ -75,6 +96,318 @@ class AdminController extends Controller
                 'success' => false,
                 'message' => 'Failed to fetch users',
                 'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function getStaff(Request $request)
+    {
+        try {
+            $query = User::where('role', '!=', 'user');
+
+            if ($request->filled('role') && $request->input('role') !== 'all') {
+                $query->where('role', $request->input('role'));
+            }
+
+            if ($request->has('q') && $request->q) {
+                $search = $request->q;
+                $query->where(function($q) use ($search) {
+                    $q->where('name', 'like', "%{$search}%")
+                      ->orWhere('email', 'like', "%{$search}%")
+                      ->orWhere('id', 'like', "%{$search}%");
+                });
+            }
+
+            if ($request->filled('status')) {
+                if ($request->status === 'active') {
+                    $query->where('is_blocked', false);
+                } elseif ($request->status === 'blocked') {
+                    $query->where('is_blocked', true);
+                }
+            }
+
+            if ($request->filled('email_status')) {
+                if ($request->email_status === 'verified') {
+                    $query->whereNotNull('email_verified_at');
+                } elseif ($request->email_status === 'unverified') {
+                    $query->whereNull('email_verified_at');
+                }
+            }
+
+            $query->withCount('bookings');
+
+            $perPage = min(max((int) $request->input('per_page', 10), 1), 50);
+            $staff = $query->latest()->paginate($perPage);
+
+            return response()->json([
+                'success' => true,
+                'data' => $staff
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to fetch staff',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function showStaff(User $user)
+    {
+        if ($user->role === 'user') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Staff account not found.',
+            ], 404);
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => $user,
+        ]);
+    }
+
+    public function storeStaff(Request $request)
+    {
+        try {
+            $validated = $request->validate([
+                'name' => 'required|string|max:255',
+                'email' => 'required|email|max:255|unique:users,email',
+                'password' => 'required|string|min:6|confirmed',
+                'role' => [
+                    'required',
+                    'string',
+                    Rule::exists('roles', 'slug')->where('is_active', true),
+                    Rule::notIn(['user']),
+                ],
+                'is_blocked' => 'nullable|boolean',
+                'email_verified' => 'nullable|boolean',
+            ]);
+
+            $staff = User::create([
+                'name' => $validated['name'],
+                'email' => $validated['email'],
+                'password' => Hash::make($validated['password']),
+                'role' => $validated['role'],
+                'is_blocked' => $validated['is_blocked'] ?? false,
+                'email_verified_at' => ($validated['email_verified'] ?? true) ? now() : null,
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Staff account created successfully.',
+                'data' => $staff,
+            ], 201);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            throw $e;
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to create staff account',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    public function updateStaff(Request $request, User $user)
+    {
+        if ($user->role === 'user') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Only staff accounts can be edited here.',
+            ], 404);
+        }
+
+        try {
+            $validated = $request->validate([
+                'name' => 'required|string|max:255',
+                'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
+                'password' => 'nullable|string|min:6|confirmed',
+                'role' => [
+                    'required',
+                    'string',
+                    Rule::exists('roles', 'slug')->where('is_active', true),
+                    Rule::notIn(['user']),
+                ],
+                'is_blocked' => 'nullable|boolean',
+                'email_verified' => 'nullable|boolean',
+            ]);
+
+            if ((int) $user->id === (int) Auth::id() && $validated['role'] !== $user->role) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'You cannot change your own role while logged in.',
+                ], 422);
+            }
+
+            if (
+                $user->role === 'admin'
+                && $validated['role'] !== 'admin'
+                && User::where('role', 'admin')->where('id', '!=', $user->id)->count() === 0
+            ) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'At least one admin must remain in the system.',
+                ], 422);
+            }
+
+            $updates = [
+                'name' => $validated['name'],
+                'email' => $validated['email'],
+                'role' => $validated['role'],
+                'is_blocked' => $validated['is_blocked'] ?? false,
+                'email_verified_at' => ($validated['email_verified'] ?? true) ? ($user->email_verified_at ?: now()) : null,
+            ];
+
+            if (!empty($validated['password'])) {
+                $updates['password'] = Hash::make($validated['password']);
+            }
+
+            $user->update($updates);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Staff account updated successfully.',
+                'data' => $user->fresh(),
+            ]);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            throw $e;
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to update staff account',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    public function blockStaff(User $user)
+    {
+        if ($user->role === 'user') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Only staff accounts can be blocked here.',
+            ], 404);
+        }
+
+        if ((int) $user->id === (int) Auth::id()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'You cannot block your own account.',
+            ], 422);
+        }
+
+        $user->update(['is_blocked' => true]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Staff account blocked successfully.',
+            'data' => $user->fresh(),
+        ]);
+    }
+
+    public function unblockStaff(User $user)
+    {
+        if ($user->role === 'user') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Only staff accounts can be unblocked here.',
+            ], 404);
+        }
+
+        $user->update(['is_blocked' => false]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Staff account unblocked successfully.',
+            'data' => $user->fresh(),
+        ]);
+    }
+
+    public function deleteStaff(User $user)
+    {
+        if ($user->role === 'user') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Only staff accounts can be deleted here.',
+            ], 404);
+        }
+
+        if ((int) $user->id === (int) Auth::id()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'You cannot delete your own account.',
+            ], 422);
+        }
+
+        if (
+            $user->role === 'admin'
+            && User::where('role', 'admin')->where('id', '!=', $user->id)->count() === 0
+        ) {
+            return response()->json([
+                'success' => false,
+                'message' => 'At least one admin must remain in the system.',
+            ], 422);
+        }
+
+        $user->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Staff account deleted successfully.',
+        ]);
+    }
+
+    public function updateUserRole(Request $request, User $user)
+    {
+        try {
+            $validated = $request->validate([
+                'role' => 'required|string|exists:roles,slug',
+            ]);
+
+            $role = Role::where('slug', $validated['role'])
+                ->where('is_active', true)
+                ->first();
+
+            if (!$role) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Selected role is not active.',
+                ], 422);
+            }
+
+            if ((int) $user->id === (int) Auth::id()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'You cannot change your own role while logged in.',
+                ], 422);
+            }
+
+            if (
+                $user->role === 'admin'
+                && $role->slug !== 'admin'
+                && User::where('role', 'admin')->where('id', '!=', $user->id)->count() === 0
+            ) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'At least one admin must remain in the system.',
+                ], 422);
+            }
+
+            $user->update(['role' => $role->slug]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'User role updated successfully.',
+                'data' => $user->fresh(),
+            ]);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            throw $e;
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to update user role',
+                'error' => $e->getMessage(),
             ], 500);
         }
     }
@@ -152,11 +485,41 @@ class AdminController extends Controller
         }
     }
 
-    public function getParkings()
+    public function getParkings(Request $request)
     {
         try {
-            // Simple query without relationships first
-            $parkings = Parking::all();
+            $query = Parking::query();
+
+            if ($request->filled('q')) {
+                $search = trim($request->input('q'));
+                $query->where(function ($parkingQuery) use ($search) {
+                    $parkingQuery->where('name', 'like', "%{$search}%")
+                        ->orWhere('description', 'like', "%{$search}%")
+                        ->orWhere('address', 'like', "%{$search}%")
+                        ->orWhere('distance', 'like', "%{$search}%")
+                        ->orWhere('price_per_hour', 'like', "%{$search}%");
+                });
+            }
+
+            if ($request->filled('status')) {
+                if ($request->input('status') === 'available') {
+                    $query->where('available_slots', '>', 0);
+                } elseif ($request->input('status') === 'full') {
+                    $query->whereColumn('available_slots', '<=', 'total_slots')
+                        ->where('available_slots', 0);
+                }
+            }
+
+            if ($request->filled('capacity')) {
+                if ($request->input('capacity') === 'has_slots') {
+                    $query->where('total_slots', '>', 0);
+                } elseif ($request->input('capacity') === 'no_slots') {
+                    $query->where('total_slots', 0);
+                }
+            }
+
+            $perPage = min(max((int) $request->input('per_page', 10), 1), 50);
+            $parkings = $query->latest('id')->paginate($perPage);
 
             return response()->json([
                 'success' => true,
@@ -181,8 +544,11 @@ class AdminController extends Controller
             $request->validate([
                 'name' => 'required|string|max:255',
                 'description' => 'required|string',
+                'address' => 'nullable|string|max:500',
                 'price_per_hour' => 'required|numeric|min:0',
-                'distance' => 'required|string|max:255',
+                'distance' => 'nullable|string|max:255',
+                'latitude' => 'nullable|numeric|between:-90,90',
+                'longitude' => 'nullable|numeric|between:-180,180',
                 'total_slots' => 'required|integer|min:1',
                 'image' => 'nullable|string'
             ]);
@@ -190,12 +556,17 @@ class AdminController extends Controller
             $parking = Parking::create([
                 'name' => $request->name,
                 'description' => $request->description,
+                'address' => $request->address,
                 'price_per_hour' => $request->price_per_hour,
                 'distance' => $request->distance,
+                'latitude' => $request->latitude,
+                'longitude' => $request->longitude,
                 'total_slots' => $request->total_slots,
                 'available_slots' => $request->total_slots,
                 'image' => $request->image
             ]);
+
+            CacheKeys::bump('public-parkings');
 
             return response()->json([
                 'success' => true,
@@ -218,8 +589,11 @@ class AdminController extends Controller
             $request->validate([
                 'name' => 'required|string|max:255',
                 'description' => 'required|string',
+                'address' => 'nullable|string|max:500',
                 'price_per_hour' => 'required|numeric|min:0',
-                'distance' => 'required|string|max:255',
+                'distance' => 'nullable|string|max:255',
+                'latitude' => 'nullable|numeric|between:-90,90',
+                'longitude' => 'nullable|numeric|between:-180,180',
                 'total_slots' => 'required|integer|min:1',
                 'image' => 'nullable|string'
             ]);
@@ -227,11 +601,16 @@ class AdminController extends Controller
             $parking->update([
                 'name' => $request->name,
                 'description' => $request->description,
+                'address' => $request->address,
                 'price_per_hour' => $request->price_per_hour,
                 'distance' => $request->distance,
+                'latitude' => $request->latitude,
+                'longitude' => $request->longitude,
                 'total_slots' => $request->total_slots,
                 'image' => $request->image
             ]);
+
+            CacheKeys::bump('public-parkings');
 
             return response()->json([
                 'success' => true,
@@ -257,6 +636,8 @@ class AdminController extends Controller
             // Then delete the parking
             $parking->delete();
 
+            CacheKeys::bump('public-parkings');
+
             return response()->json([
                 'success' => true,
                 'message' => 'Parking deleted successfully'
@@ -271,10 +652,36 @@ class AdminController extends Controller
         }
     }
 
-    public function getSlots()
+    public function getSlots(Request $request)
     {
         try {
-            $slots = Slot::with('parking')->latest()->get();
+            $query = Slot::with('parking');
+
+            if ($request->filled('q')) {
+                $search = trim($request->input('q'));
+                $query->where(function ($slotQuery) use ($search) {
+                    $slotQuery->where('slot_code', 'like', "%{$search}%")
+                        ->orWhere('type', 'like', "%{$search}%")
+                        ->orWhereHas('parking', function ($parkingQuery) use ($search) {
+                            $parkingQuery->where('name', 'like', "%{$search}%");
+                        });
+                });
+            }
+
+            if ($request->filled('parking_id')) {
+                $query->where('parking_id', $request->input('parking_id'));
+            }
+
+            if ($request->filled('status')) {
+                if ($request->input('status') === 'available') {
+                    $query->where('available', true);
+                } elseif ($request->input('status') === 'occupied') {
+                    $query->where('available', false);
+                }
+            }
+
+            $perPage = min(max((int) $request->input('per_page', 10), 1), 50);
+            $slots = $query->latest()->paginate($perPage);
 
             return response()->json([
                 'success' => true,
@@ -306,6 +713,8 @@ class AdminController extends Controller
                 'type' => $request->type,
                 'available' => $request->available ?? true
             ]);
+
+            CacheKeys::bump('public-parkings');
 
             return response()->json([
                 'success' => true,
@@ -339,6 +748,8 @@ class AdminController extends Controller
                 'available' => $request->available
             ]);
 
+            CacheKeys::bump('public-parkings');
+
             return response()->json([
                 'success' => true,
                 'message' => 'Slot updated successfully',
@@ -360,6 +771,8 @@ class AdminController extends Controller
             $slot->update([
                 'available' => $request->available
             ]);
+
+            CacheKeys::bump('public-parkings');
 
             return response()->json([
                 'success' => true,
@@ -389,6 +802,8 @@ class AdminController extends Controller
 
             $slot->delete();
 
+            CacheKeys::bump('public-parkings');
+
             return response()->json([
                 'success' => true,
                 'message' => 'Slot deleted successfully'
@@ -407,23 +822,25 @@ class AdminController extends Controller
     {
         try {
             $request->validate([
-                'image' => 'required|image|mimes:jpeg,png,jpg,gif|max:5120' // 5MB max
+                'image' => 'required|image|mimes:jpeg,png,jpg,gif,webp|max:5120'
             ]);
 
             if ($request->hasFile('image')) {
-                $image = $request->file('image');
-                $imageName = time() . '_' . uniqid() . '.' . $image->getClientOriginalExtension();
-                
-                // Store in public storage
-                $path = $image->storeAs('images/parkings', $imageName, 'public');
-                
-                /*$url = asset('storage/' . $path);*/
+                $uploaded = app(ImageUploadService::class)->storePublicImage($request->file('image'), 'images/parkings', [
+                    'prefix' => 'parking',
+                    'width' => 1280,
+                    'height' => 820,
+                    'fit' => 'cover',
+                    'quality' => 82,
+                ]);
 
                 return response()->json([
                     'success' => true,
                     'message' => 'Image uploaded successfully',
-                    'url' => 'storage/' . $path,
-                    'path' => $path
+                    'url' => $uploaded['url'],
+                    'path' => $uploaded['path'],
+                    'extension' => $uploaded['extension'],
+                    'size' => $uploaded['size'],
                 ]);
             }
 
@@ -468,7 +885,15 @@ class AdminController extends Controller
             if ($request->has('status') && $request->status) {
                 $query->where('status', $request->status);
             }
-            
+
+            if ($request->filled('date_from')) {
+                $query->whereDate('created_at', '>=', $request->date_from);
+            }
+
+            if ($request->filled('date_to')) {
+                $query->whereDate('created_at', '<=', $request->date_to);
+            }
+
             // Pagination
             $perPage = $request->per_page ?? 10;
             $transactions = $query->latest()->paginate($perPage);
@@ -595,7 +1020,15 @@ class AdminController extends Controller
             if ($request->has('status') && $request->status) {
                 $query->where('status', $request->status);
             }
-            
+
+            if ($request->filled('date_from')) {
+                $query->whereDate('created_at', '>=', $request->date_from);
+            }
+
+            if ($request->filled('date_to')) {
+                $query->whereDate('created_at', '<=', $request->date_to);
+            }
+
             // Pagination
             $perPage = $request->per_page ?? 15;
             $bookings = $query->latest()->paginate($perPage);
@@ -922,7 +1355,7 @@ class AdminController extends Controller
             $totalSlots = Slot::count();
             $availableSlots = Slot::where('available', true)->count();
             
-            $activeBookings = Booking::whereIn('status', ['confirmed', 'active'])->count();
+            $activeBookings = Booking::whereIn('status', ['confirmed', 'active', 'checkout_requested', 'checkout_paid'])->count();
             $completedBookings = Booking::where('status', 'completed')->count();
             $pendingBookings = Booking::where('status', 'pending')->count();
             $cancelledBookings = Booking::where('status', 'cancelled')->count();
@@ -932,13 +1365,48 @@ class AdminController extends Controller
             // Today's revenue
             $todayRevenue = Booking::where('status', 'completed')
                 ->whereDate('created_at', Carbon::today())
-                ->sum('total_price');
+                ->sum(DB::raw('COALESCE(NULLIF(grand_total, 0), total_price)'));
             
             // Monthly revenue
             $monthlyRevenue = Booking::where('status', 'completed')
                 ->whereMonth('created_at', Carbon::now()->month)
                 ->whereYear('created_at', Carbon::now()->year)
-                ->sum('total_price');
+                ->sum(DB::raw('COALESCE(NULLIF(grand_total, 0), total_price)'));
+
+            $totalRevenue = Booking::where('status', 'completed')
+                ->sum(DB::raw('COALESCE(NULLIF(grand_total, 0), total_price)'));
+
+            $yearlyRevenue = Booking::where('status', 'completed')
+                ->whereYear('created_at', Carbon::now()->year)
+                ->sum(DB::raw('COALESCE(NULLIF(grand_total, 0), total_price)'));
+
+            $totalServices = Service::count();
+            $activeServices = Service::where(function ($query) {
+                    $query->where('status', 'active')
+                        ->orWhere('is_active', true);
+                })
+                ->count();
+
+            $totalServiceOrders = ServiceOrder::count();
+            $completedServiceOrders = ServiceOrder::where('status', 'completed')->count();
+            $pendingServiceOrders = ServiceOrder::where('status', 'pending')->count();
+            $inProgressServiceOrders = ServiceOrder::where('status', 'in_progress')->count();
+            $cancelledServiceOrders = ServiceOrder::where('status', 'cancelled')->count();
+
+            $totalServiceRevenue = ServiceOrder::where('service_orders.status', 'completed')
+                ->join('services', 'service_orders.service_id', '=', 'services.id')
+                ->sum('services.price');
+
+            $todayServiceRevenue = ServiceOrder::where('service_orders.status', 'completed')
+                ->whereDate('service_orders.created_at', Carbon::today())
+                ->join('services', 'service_orders.service_id', '=', 'services.id')
+                ->sum('services.price');
+
+            $monthlyServiceRevenue = ServiceOrder::where('service_orders.status', 'completed')
+                ->whereMonth('service_orders.created_at', Carbon::now()->month)
+                ->whereYear('service_orders.created_at', Carbon::now()->year)
+                ->join('services', 'service_orders.service_id', '=', 'services.id')
+                ->sum('services.price');
             
             // Recent bookings
             $recentBookings = Booking::with(['user', 'parking', 'slot'])
@@ -957,9 +1425,28 @@ class AdminController extends Controller
                         'slot' => [
                             'slot_code' => $booking->slot->slot_code ?? 'N/A'
                         ],
-                        'total_price' => $booking->total_price,
+                        'total_price' => $booking->grand_total > 0 ? $booking->grand_total : $booking->total_price,
                         'status' => $booking->status,
                         'created_at' => $booking->created_at
+                    ];
+                });
+
+            $recentServiceOrders = ServiceOrder::with(['user', 'service'])
+                ->orderBy('created_at', 'desc')
+                ->take(5)
+                ->get()
+                ->map(function ($order) {
+                    return [
+                        'id' => $order->id,
+                        'user' => [
+                            'name' => $order->user->name ?? 'N/A',
+                        ],
+                        'service' => [
+                            'name' => $order->service->name ?? 'N/A',
+                            'price' => $order->service->price ?? 0,
+                        ],
+                        'status' => $order->status,
+                        'created_at' => $order->created_at,
                     ];
                 });
             
@@ -973,9 +1460,25 @@ class AdminController extends Controller
                     'totalUsers' => $totalUsers,
                     'todayRevenue' => (float) $todayRevenue,
                     'monthlyRevenue' => (float) $monthlyRevenue,
+                    'totalRevenue' => (float) $totalRevenue,
+                    'yearlyRevenue' => (float) $yearlyRevenue,
                     'completedBookings' => $completedBookings,
                     'pendingBookings' => $pendingBookings,
-                    'cancelledBookings' => $cancelledBookings
+                    'cancelledBookings' => $cancelledBookings,
+                    'totalServices' => $totalServices,
+                    'activeServices' => $activeServices,
+                    'totalServiceOrders' => $totalServiceOrders,
+                    'completedServiceOrders' => $completedServiceOrders,
+                    'pendingServiceOrders' => $pendingServiceOrders,
+                    'inProgressServiceOrders' => $inProgressServiceOrders,
+                    'cancelledServiceOrders' => $cancelledServiceOrders,
+                    'totalServiceRevenue' => (float) $totalServiceRevenue,
+                    'todayServiceRevenue' => (float) $todayServiceRevenue,
+                    'monthlyServiceRevenue' => (float) $monthlyServiceRevenue,
+                    'totalCombinedRevenue' => (float) $totalRevenue + (float) $totalServiceRevenue,
+                    'totalCombinedBookings' => $totalServiceOrders + Booking::count(),
+                    'recentBookings' => $recentBookings,
+                    'recentServiceOrders' => $recentServiceOrders,
                 ]
             ]);
             
@@ -1036,6 +1539,20 @@ class AdminController extends Controller
                 });
             }
 
+            if ($request->filled('status')) {
+                if ($request->status === 'payment_required') {
+                    $query->where('status', 'checkout_requested')
+                        ->where('extra_charges', '>', 0);
+                } elseif ($request->status === 'pending_review') {
+                    $query->where('status', 'checkout_requested')
+                        ->where(function ($q) {
+                            $q->whereNull('extra_charges')->orWhere('extra_charges', '<=', 0);
+                        });
+                } elseif ($request->status === 'ready_approval') {
+                    $query->where('status', 'checkout_paid');
+                }
+            }
+
             $perPage = $request->per_page ?? 10;
             $checkouts = $query->latest()->paginate($perPage);
 
@@ -1079,19 +1596,22 @@ class AdminController extends Controller
 
                 // Update slot availability
                 $slot = Slot::find($booking->slot_id);
+                $slotWasUnavailable = $slot && !$slot->available;
                 if ($slot) {
                     $slot->available = true;
                     $slot->save();
                     \Log::info('Slot updated: ' . $slot->id);
                 }
 
-                // Update parking available slots
+                // Update parking available slots only once for the slot that was released.
                 $parking = Parking::find($booking->parking_id);
-                if ($parking) {
-                    $parking->available_slots = $parking->available_slots;
+                if ($parking && $slotWasUnavailable) {
+                    $parking->available_slots = min($parking->total_slots, $parking->available_slots + 1);
                     $parking->save();
                     \Log::info('Parking updated: ' . $parking->id);
                 }
+
+                CacheKeys::bump('public-parkings');
 
                 // Generate professional ticket number
                 $ticketNumber = 'PKT' . date('ymd') . '-' . str_pad($booking->id, 5, '0', STR_PAD_LEFT);
@@ -1157,6 +1677,8 @@ class AdminController extends Controller
                 'checkout_approved' => false,
                 'actual_end_time' => now()
             ]);
+
+            CacheKeys::bump('public-parkings');
 
             return response()->json([
                 'success' => true,
@@ -1390,7 +1912,7 @@ class AdminController extends Controller
 public function getServiceOrders(Request $request)
 {
     try {
-        $query = ServiceOrder::with(['user', 'service']);
+        $query = ServiceOrder::with(['user', 'service.serviceCenter', 'assignedMechanic']);
 
         // Search functionality
         if ($request->has('q') && $request->q) {
@@ -1410,6 +1932,14 @@ public function getServiceOrders(Request $request)
         // Filter by status
         if ($request->has('status') && $request->status) {
             $query->where('status', $request->status);
+        }
+
+        if ($request->filled('date_from')) {
+            $query->whereDate('created_at', '>=', $request->date_from);
+        }
+
+        if ($request->filled('date_to')) {
+            $query->whereDate('created_at', '<=', $request->date_to);
         }
 
         // Pagination
@@ -1515,15 +2045,32 @@ public function getServiceOrderStats()
 
     public function confirmBooking(Request $request, $id)
     {
+        $validated = $request->validate([
+            'mechanic_id' => 'nullable|exists:users,id',
+        ]);
+
         DB::beginTransaction();
         try {
-            $order = ServiceOrder::with(['user', 'service'])->findOrFail($id);
+            $order = ServiceOrder::with(['user', 'service'])
+                ->whereKey($id)
+                ->lockForUpdate()
+                ->firstOrFail();
             
             if ($order->status !== 'pending') {
+                DB::rollBack();
                 return response()->json([
                     'success' => false,
                     'message' => 'Only pending orders can be confirmed'
                 ], 400);
+            }
+
+            $mechanicId = $this->resolveServiceMechanicId($validated['mechanic_id'] ?? null);
+            if (!$mechanicId) {
+                DB::rollBack();
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No mechanic is available to assign this service order.'
+                ], 422);
             }
 
             // Generate booking slip first
@@ -1532,7 +2079,8 @@ public function getServiceOrderStats()
             // Update status + slip_number to database
             $order->update([
                 'status' => 'confirmed',
-                'slip_number' => $slipData['slip_number']
+                'slip_number' => $slipData['slip_number'],
+                'assigned_mechanic_id' => $mechanicId,
             ]);
 
             // Send confirmation email
@@ -1601,10 +2149,10 @@ private function generateBookingSlip($order)
         $serviceDuration = $this->parseDuration($order->service->duration);
         
         // Schedule in_progress status at booking time
-        $inProgressTime = $bookingTime;
+        $inProgressTime = $bookingTime->copy();
         
         // Schedule completed status after service duration
-        $completedTime = $bookingTime->addMinutes($serviceDuration);
+        $completedTime = $bookingTime->copy()->addMinutes($serviceDuration);
 
         // In a real application, you would use Laravel Scheduler or Jobs
         // For now, we'll handle this in a separate method that can be called by cron
@@ -1645,17 +2193,24 @@ private function generateBookingSlip($order)
                 ->get();
 
             foreach ($inProgressOrders as $order) {
-                $order->update(['status' => 'in_progress']);
+                $order->update([
+                    'status' => 'in_progress',
+                    'started_at' => now(),
+                ]);
                 Log::info("Auto updated to in_progress", ['order_id' => $order->id]);
             }
 
             // Update to completed and generate invoices
-            $completedOrders = ServiceOrder::where('status', 'in_progress')
+            $completedOrders = ServiceOrder::with(['user', 'service'])
+                ->where('status', 'in_progress')
                 ->where('scheduled_completed_at', '<=', $now)
                 ->get();
 
             foreach ($completedOrders as $order) {
-                $order->update(['status' => 'completed']);
+                $order->update([
+                    'status' => 'completed',
+                    'completed_at' => now(),
+                ]);
                 $this->generateInvoice($order);
                 
                 // Send completion email
@@ -1714,32 +2269,83 @@ private function generateBookingSlip($order)
     public function updateStatus(Request $request, $id)
     {
         try {
-            $request->validate([
-                'status' => 'required|in:pending,confirmed,in_progress,completed,cancelled'
+            $validated = $request->validate([
+                'status' => 'required|in:pending,confirmed,in_progress,completed,cancelled',
+                'mechanic_id' => 'nullable|exists:users,id',
+                'reason' => 'nullable|string|max:1000',
             ]);
 
-            $order = ServiceOrder::findOrFail($id);
-            $oldStatus = $order->status;
-            $order->update(['status' => $request->status]);
+            return DB::transaction(function () use ($id, $validated) {
+                $order = ServiceOrder::with(['user', 'service'])
+                    ->whereKey($id)
+                    ->lockForUpdate()
+                    ->firstOrFail();
+                $oldStatus = $order->status;
+                $newStatus = $validated['status'];
 
-            // If confirming, send email and generate slip
-            if ($request->status === 'confirmed' && $oldStatus === 'pending') {
-                $slipData = $this->generateBookingSlip($order);
-                Mail::to($order->user->email)->queue(new BookingConfirmedMail($order, $slipData));
-                $this->scheduleStatusUpdates($order);
-            }
+                if (!$this->isServiceOrderTransitionAllowed($oldStatus, $newStatus)) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => "Cannot change status from {$oldStatus} to {$newStatus}."
+                    ], 422);
+                }
 
-            // If completing, generate invoice
-            if ($request->status === 'completed' && $oldStatus === 'in_progress') {
-                $this->generateInvoice($order);
-                Mail::to($order->user->email)->queue(new ServiceCompletedMail($order));
-            }
+                if ($newStatus === 'cancelled') {
+                    $refundAmount = 0;
+                    if (in_array($oldStatus, ['pending', 'confirmed'], true)) {
+                        $refundAmount = $this->refundServiceOrder($order, $validated['reason'] ?? 'Cancelled by admin');
+                    } else {
+                        $order->update([
+                            'status' => 'cancelled',
+                            'cancelled_at' => now(),
+                            'cancellation_reason' => $validated['reason'] ?? 'Cancelled by admin',
+                        ]);
+                    }
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Order status updated successfully',
-                'data' => $order
-            ]);
+                    return response()->json([
+                        'success' => true,
+                        'message' => 'Order cancelled successfully',
+                        'refund_amount' => $refundAmount,
+                        'data' => $order->fresh(['user', 'service', 'assignedMechanic'])
+                    ]);
+                }
+
+                $updates = ['status' => $newStatus];
+
+                // If confirming, send email and generate slip
+                if ($newStatus === 'confirmed' && $oldStatus === 'pending') {
+                    $mechanicId = $this->resolveServiceMechanicId($validated['mechanic_id'] ?? null);
+                    if (!$mechanicId) {
+                        return response()->json([
+                            'success' => false,
+                            'message' => 'No mechanic is available to assign this service order.'
+                        ], 422);
+                    }
+
+                    $slipData = $this->generateBookingSlip($order);
+                    $updates['slip_number'] = $slipData['slip_number'];
+                    $updates['assigned_mechanic_id'] = $mechanicId;
+                    $order->update($updates);
+                    Mail::to($order->user->email)->queue(new BookingConfirmedMail($order, $slipData));
+                    $this->scheduleStatusUpdates($order);
+                } elseif ($newStatus === 'in_progress' && $oldStatus === 'confirmed') {
+                    $updates['started_at'] = now();
+                    $order->update($updates);
+                } elseif ($newStatus === 'completed' && $oldStatus === 'in_progress') {
+                    $updates['completed_at'] = now();
+                    $order->update($updates);
+                    $this->generateInvoice($order);
+                    Mail::to($order->user->email)->queue(new ServiceCompletedMail($order));
+                } else {
+                    $order->update($updates);
+                }
+
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Order status updated successfully',
+                    'data' => $order->fresh(['user', 'service', 'assignedMechanic'])
+                ]);
+            });
 
         } catch (\Exception $e) {
             Log::error('Update status error: ' . $e->getMessage());
@@ -1748,6 +2354,82 @@ private function generateBookingSlip($order)
                 'message' => 'Failed to update order status'
             ], 500);
         }
+    }
+
+    private function isServiceOrderTransitionAllowed(string $oldStatus, string $newStatus): bool
+    {
+        if ($oldStatus === $newStatus) {
+            return true;
+        }
+
+        $allowed = [
+            'pending' => ['confirmed', 'cancelled'],
+            'confirmed' => ['in_progress', 'cancelled'],
+            'in_progress' => ['completed', 'cancelled'],
+            'completed' => [],
+            'cancelled' => [],
+        ];
+
+        return in_array($newStatus, $allowed[$oldStatus] ?? [], true);
+    }
+
+    private function resolveServiceMechanicId(?int $requestedMechanicId = null): ?int
+    {
+        if ($requestedMechanicId) {
+            return User::whereKey($requestedMechanicId)
+                ->where('role', 'mechanic')
+                ->value('id');
+        }
+
+        return User::where('role', 'mechanic')
+            ->withCount(['assignedServiceOrders as active_service_orders_count' => function ($query) {
+                $query->whereIn('status', ['confirmed', 'in_progress']);
+            }])
+            ->orderBy('active_service_orders_count')
+            ->orderBy('id')
+            ->value('id');
+    }
+
+    private function refundServiceOrder(ServiceOrder $order, string $reason): float
+    {
+        if ($order->refunded_at) {
+            return (float) $order->refunded_amount;
+        }
+
+        $refundAmount = (float) ($order->paid_amount ?: optional($order->service)->price ?: 0);
+        $user = User::whereKey($order->user_id)->lockForUpdate()->firstOrFail();
+
+        if ($refundAmount > 0 && \Illuminate\Support\Facades\Schema::hasTable('wallet_transactions')) {
+            $transactionData = [
+                'user_id' => $user->id,
+                'type' => 'refund',
+                'amount' => $refundAmount,
+                'payment_method' => 'wallet',
+                'status' => 'completed',
+                'description' => 'Refund for cancelled service order #' . $order->id,
+            ];
+
+            if (\Illuminate\Support\Facades\Schema::hasColumn('wallet_transactions', 'generated_transaction_id')) {
+                $transactionData['generated_transaction_id'] = 'SRV-REF-' . now()->format('YmdHis') . '-' . \Illuminate\Support\Str::upper(\Illuminate\Support\Str::random(6));
+            }
+
+            WalletTransaction::create($transactionData);
+        }
+
+        if ($refundAmount > 0) {
+            $user->wallet_balance = (float) $user->wallet_balance + $refundAmount;
+            $user->save();
+        }
+
+        $order->update([
+            'status' => 'cancelled',
+            'cancelled_at' => now(),
+            'cancellation_reason' => $reason,
+            'refunded_at' => $refundAmount > 0 ? now() : null,
+            'refunded_amount' => $refundAmount,
+        ]);
+
+        return $refundAmount;
     }
 
     public function downloadServiceSlip($id)
@@ -1946,6 +2628,8 @@ public function addService(Request $request)
             'status' => $request->status
         ]);
 
+        CacheKeys::bump('public-services');
+
         return response()->json([
             'success' => true,
             'message' => 'Service added successfully',
@@ -1983,6 +2667,8 @@ public function updateService(Request $request, Service $service)
             'status' => $request->status
         ]);
 
+        CacheKeys::bump('public-services');
+
         return response()->json([
             'success' => true,
             'message' => 'Service updated successfully',
@@ -2019,6 +2705,8 @@ public function deleteService(Service $service)
         $service->delete();
         \Log::info('Service deleted successfully', ['service_id' => $service->id]);
 
+        CacheKeys::bump('public-services');
+
         return response()->json([
             'success' => true,
             'message' => 'Service deleted successfully'
@@ -2041,6 +2729,8 @@ public function toggleServiceStatus(Service $service)
             'status' => $service->status === 'active' ? 'inactive' : 'active'
         ]);
 
+        CacheKeys::bump('public-services');
+
         return response()->json([
             'success' => true,
             'message' => 'Service status updated successfully',
@@ -2060,23 +2750,25 @@ public function toggleServiceStatus(Service $service)
     {
         try {
             $request->validate([
-                'image' => 'required|image|mimes:jpeg,png,jpg,gif|max:5120'
+                'image' => 'required|image|mimes:jpeg,png,jpg,gif,webp|max:5120'
             ]);
 
             if ($request->hasFile('image')) {
-                $image = $request->file('image');
-                $imageName = time() . '_' . uniqid() . '.' . $image->getClientOriginalExtension();
-                
-                $path = $image->storeAs('images/services', $imageName, 'public');
-                
-                // পার্কিং এর মতোই URL return করুন
-                /*$url = asset('storage/' . $path);*/
+                $uploaded = app(ImageUploadService::class)->storePublicImage($request->file('image'), 'images/services', [
+                    'prefix' => 'service',
+                    'width' => 1280,
+                    'height' => 820,
+                    'fit' => 'cover',
+                    'quality' => 82,
+                ]);
 
                 return response()->json([
                     'success' => true,
                     'message' => 'Service image uploaded successfully',
-                    'url' => 'storage/' . $path,
-                    'path' => $path
+                    'url' => $uploaded['url'],
+                    'path' => $uploaded['path'],
+                    'extension' => $uploaded['extension'],
+                    'size' => $uploaded['size'],
                 ]);
             }
 

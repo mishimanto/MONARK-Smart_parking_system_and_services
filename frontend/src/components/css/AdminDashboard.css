@@ -1,6 +1,6 @@
 .admin-dashboard-page {
   display: grid;
-  gap: 22px;
+  gap: 24px;
 }
 
 .admin-dashboard-hero,
@@ -9,19 +9,24 @@
 .admin-dashboard-panel,
 .admin-dashboard-loading,
 .admin-dashboard-error {
-  border: 1px solid rgba(8, 145, 178, 0.14);
+  border: 1px solid rgba(8, 145, 178, 0.12);
   border-radius: 4px;
   background: #ffffff;
-  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.08);
+  box-shadow: 0 18px 46px rgba(15, 23, 42, 0.08);
 }
 
 .admin-dashboard-hero {
+  position: relative;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 22px;
-  padding: 18px;
+  overflow: hidden;
+  padding: 12px;
   border-left: 4px solid #00f7ff;
+  background:
+    radial-gradient(circle at 92% 14%, rgba(0, 247, 255, 0.16), transparent 28%),
+    linear-gradient(135deg, #ffffff 0%, #f8fcff 100%);
 }
 
 .admin-dashboard-hero span,
@@ -30,7 +35,7 @@
 .admin-metric-card span,
 .admin-record-card span {
   color: #0891b2;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 900;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -40,7 +45,7 @@
   max-width: 760px;
   margin: 10px 0 10px;
   color: #0f172a;
-  font-size: clamp(12px, 3vw, 20px);
+  font-size: clamp(16px, 3vw, 20px);
   font-weight: 950;
   line-height: 1.08;
 }
@@ -51,12 +56,11 @@
 .admin-record-card p {
   margin: 0;
   color: #64748b;
-  font-size: 16px;
+  font-size: 13px;
   font-weight: 700;
 }
 
 .admin-dashboard-hero button,
-.admin-panel-head a,
 .admin-dashboard-error button {
   min-height: 42px;
   display: inline-flex;
@@ -73,11 +77,23 @@
   text-decoration: none;
 }
 
+.admin-panel-head a {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  color: #020617;
+  padding: 0 14px;
+  font-size: 13px;
+  font-weight: 900;
+  text-decoration: underline;
+}
+
 .admin-dashboard-hero button:hover,
-.admin-panel-head a:hover,
 .admin-dashboard-error button:hover {
   background: #67e8f9;
   border-color: #67e8f9;
+  transform: translateY(-1px);
 }
 
 .admin-hero-stats {
@@ -87,30 +103,67 @@
 }
 
 .admin-hero-stat {
-  min-height: 150px;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 18px;
-  align-items: start;
-  padding: 22px;
+  align-items: center;
+  padding: 24px;
   position: relative;
   overflow: hidden;
+  isolation: isolate;
+  border: 0;
+  color: #ffffff;
+  transition: transform 0.22s ease, box-shadow 0.22s ease;
+}
+
+.admin-hero-stat::before,
+.admin-metric-card::before {
+  position: absolute;
+  right: -34px;
+  top: -34px;
+  width: 128px;
+  height: 128px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.18);
+  box-shadow:
+    -24px 46px 0 rgba(255, 255, 255, 0.1),
+    -78px 24px 0 rgba(255, 255, 255, 0.06);
+  content: "";
+  z-index: -1;
 }
 
 .admin-hero-stat::after {
   position: absolute;
-  right: 18px;
-  bottom: 16px;
-  width: 70px;
-  height: 2px;
-  background: #00f7ff;
+  left: 24px;
+  right: 24px;
+  bottom: 18px;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.24);
   content: "";
+}
+
+.admin-hero-stat:nth-child(1) {
+  background: linear-gradient(135deg, #0f766e 0%, #0891b2 100%);
+}
+
+.admin-hero-stat:nth-child(2) {
+  background: linear-gradient(135deg, #1d4ed8 0%, #0f766e 100%);
+}
+
+.admin-hero-stat:nth-child(3) {
+  background: linear-gradient(135deg, #111827 0%, #164e63 100%);
+}
+
+.admin-hero-stat:hover,
+.admin-metric-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 24px 54px rgba(15, 23, 42, 0.16);
 }
 
 .admin-hero-stat strong {
   display: block;
   margin: 10px 0 8px;
-  color: #0f172a;
+  color: #ffffff;
   font-size: clamp(24px, 3vw, 34px);
   font-weight: 950;
   line-height: 1;
@@ -118,28 +171,118 @@
 
 .admin-hero-stat svg,
 .admin-metric-card svg {
-  color: #0891b2;
+  color: currentColor;
   font-size: 28px;
+}
+
+.admin-hero-stat span,
+.admin-hero-stat p {
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.admin-hero-stat svg {
+  color: rgba(255, 255, 255, 0.86);
+  font-size: 34px;
+  justify-self: end;
+  align-self: center;
 }
 
 .admin-metric-grid {
   display: grid;
   grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: 16px;
+  align-items: stretch;
+  gap: 18px;
 }
 
 .admin-metric-card {
-  min-height: 150px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  justify-content: space-between;
-  padding: 18px;
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 54px;
+  grid-template-rows: auto auto auto;
+  align-items: center;
+  column-gap: 16px;
+  row-gap: 8px;
+  overflow: hidden;
+  isolation: isolate;
+  border: 0;
+  padding: 20px;
+  transition: transform 0.22s ease, box-shadow 0.22s ease;
+}
+
+.admin-metric-card:nth-child(1) {
+  background: linear-gradient(135deg, #ecfeff 0%, #ffffff 70%);
+  color: #0891b2;
+}
+
+.admin-metric-card:nth-child(2) {
+  background: linear-gradient(135deg, #eff6ff 0%, #ffffff 70%);
+  color: #2563eb;
+}
+
+.admin-metric-card:nth-child(3) {
+  background: linear-gradient(135deg, #fff7ed 0%, #ffffff 70%);
+  color: #ea580c;
+}
+
+.admin-metric-card:nth-child(4) {
+  background: linear-gradient(135deg, #f0fdf4 0%, #ffffff 70%);
+  color: #16a34a;
+}
+
+.admin-metric-card:nth-child(5) {
+  background: linear-gradient(135deg, #fdf2f8 0%, #ffffff 70%);
+  color: #db2777;
+}
+
+.admin-metric-card:nth-child(6) {
+  background: linear-gradient(135deg, #f5f3ff 0%, #ffffff 70%);
+  color: #7c3aed;
+}
+
+.admin-metric-card::before {
+  width: 96px;
+  height: 96px;
+  right: -28px;
+  top: -28px;
+  background: currentColor;
+  opacity: 0.11;
+  box-shadow:
+    -22px 44px 0 currentColor,
+    -66px 24px 0 currentColor;
+}
+
+.admin-metric-card::after {
+  position: absolute;
+  right: 18px;
+  bottom: 16px;
+  width: 54px;
+  height: 2px;
+  background: currentColor;
+  content: "";
+  opacity: 0.45;
+}
+
+.admin-metric-card svg {
+  width: 44px;
+  height: 44px;
+  grid-column: 2;
+  grid-row: 1 / 4;
+  justify-self: end;
+  align-self: center;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.64);
+  padding: 9px;
+}
+
+.admin-metric-card span,
+.admin-metric-card strong,
+.admin-metric-card p {
+  grid-column: 1;
 }
 
 .admin-metric-card strong {
   color: #0f172a;
-  font-size: 22px;
+  font-size: 20px;
   font-weight: 950;
   line-height: 1.15;
   overflow-wrap: anywhere;
@@ -153,18 +296,19 @@
 
 .admin-dashboard-panel {
   padding: 22px;
+  background:
+    linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
 }
 
 .admin-panel-head {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 18px;
   margin-bottom: 18px;
 }
 
 .admin-panel-head h3 {
-  margin: 6px 0 0;
   color: #0f172a;
   font-size: 20px;
   font-weight: 950;
@@ -184,6 +328,13 @@
   border-radius: 4px;
   background: #f8fbff;
   padding: 14px;
+  transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+}
+
+.admin-record-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(8, 145, 178, 0.24);
+  background: #ffffff;
 }
 
 .admin-record-card h4 {
@@ -227,7 +378,9 @@
 .admin-breakdown-row > div {
   border: 1px solid rgba(8, 145, 178, 0.12);
   border-radius: 4px;
-  background: #f8fbff;
+  background:
+    radial-gradient(circle at 88% 10%, rgba(0, 247, 255, 0.14), transparent 34%),
+    #f8fbff;
   padding: 14px;
 }
 
@@ -254,6 +407,7 @@
   overflow: hidden;
   border: 1px solid rgba(8, 145, 178, 0.12);
   border-radius: 4px;
+  background: #ffffff;
 }
 
 .admin-revenue-head,
@@ -276,6 +430,10 @@
 .admin-revenue-row {
   background: #ffffff;
   color: #334155;
+}
+
+.admin-revenue-row:nth-child(even) {
+  background: #f8fbff;
 }
 
 .admin-revenue-row + .admin-revenue-row {

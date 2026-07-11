@@ -1,28 +1,49 @@
-import React, { useCallback, useState, useEffect } from "react";
-import { adminAPI } from "../../api/client";
+import React, { useCallback, useEffect, useState } from "react";
 import Swal from "sweetalert2";
+import {
+  RiCalendarCheckLine,
+  RiCheckDoubleLine,
+  RiCloseCircleLine,
+  RiCoinsLine,
+  RiFileList3Line,
+  RiInboxLine,
+  RiMapPinLine,
+  RiMoneyDollarCircleLine,
+  RiParkingBoxLine,
+  RiRefreshLine,
+  RiTimeLine,
+  RiUser3Line,
+  RiWallet3Line,
+} from "react-icons/ri";
+import { adminAPI } from "../../api/client";
+import AdminFilterBar from "./components/AdminFilterBar";
+import AdminPagination from "./components/AdminPagination";
+import { showErrorToast, showSuccessToast } from "../../utils/toast";
+import "./css/ParkingAdmin.css";
+import "./css/ServiceAdmin.css";
+import "./css/CheckoutAdmin.css";
 
 export default function AdminCheckouts() {
   const [checkouts, setCheckouts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
   const [actionLoading, setActionLoading] = useState(null);
   const [stats, setStats] = useState({
     pending_requests: 0,
     awaiting_payment: 0,
     ready_for_approval: 0,
-    total_revenue: 0
+    total_revenue: 0,
   });
-  const [meta, setMeta] = useState({ 
-    current_page: 1, 
-    last_page: 1, 
-    per_page: 10, 
-    total: 0 
+  const [meta, setMeta] = useState({
+    current_page: 1,
+    last_page: 1,
+    per_page: 10,
+    total: 0,
   });
   const [page, setPage] = useState(1);
   const [perPage] = useState(10);
 
-  // Fetch stats from database
   const fetchStats = useCallback(async () => {
     try {
       const response = await adminAPI.getCheckoutStats();
@@ -34,74 +55,64 @@ export default function AdminCheckouts() {
     }
   }, []);
 
-  // Fetch pending checkouts
   const fetchPendingCheckouts = useCallback(async (p = 1) => {
     try {
       setLoading(true);
-      const response = await adminAPI.getPendingCheckouts({ 
+      const response = await adminAPI.getPendingCheckouts({
         q: searchTerm,
+        status: statusFilter || undefined,
         page: p,
-        per_page: perPage
+        per_page: perPage,
       });
-      
+
       if (response.data.success) {
-        setCheckouts(response.data.data.data || response.data.data);
+        const payload = response.data.data;
+        const rows = payload.data || payload;
+        setCheckouts(rows);
         setMeta({
-          current_page: response.data.data.current_page || 1,
-          last_page: response.data.data.last_page || 1,
-          per_page: response.data.data.per_page || perPage,
-          total: response.data.data.total || (response.data.data.data || response.data.data).length
+          current_page: payload.current_page || 1,
+          last_page: payload.last_page || 1,
+          per_page: payload.per_page || perPage,
+          total: payload.total || rows.length,
         });
-        
-        // Fetch updated stats after loading checkouts
         await fetchStats();
       }
     } catch (error) {
       console.error("Failed to fetch checkouts:", error);
-      Swal.fire({
-        title: 'Error!',
-        text: 'Failed to load pending checkouts',
-        icon: 'error',
-        confirmButtonText: 'OK',
-        confirmButtonColor: '#d33',
-      });
+      showErrorToast("Failed to load pending checkouts");
     } finally {
       setLoading(false);
     }
-  }, [fetchStats, perPage, searchTerm]);
+  }, [fetchStats, perPage, searchTerm, statusFilter]);
 
   useEffect(() => {
     fetchPendingCheckouts(page);
   }, [fetchPendingCheckouts, page]);
 
-  // Handle search
-  const handleSearch = (e) => {
-    e.preventDefault();
+  const handleSearchChange = useCallback((value) => {
+    setSearchTerm(value);
     setPage(1);
-    fetchPendingCheckouts(1);
-  };
+  }, []);
 
-  // Handle refresh
   const handleRefresh = () => {
     setSearchTerm("");
+    setStatusFilter("");
     setPage(1);
-    fetchPendingCheckouts(1);
   };
 
-  // Handle approve checkout
   const handleApproveCheckout = async (checkoutId) => {
     try {
       setActionLoading(checkoutId);
-      
+
       const result = await Swal.fire({
-        title: 'Approve Checkout?',
-        text: 'Are you sure you want to approve this checkout? This will generate a ticket and release the parking slot.',
-        icon: 'question',
+        title: "Approve checkout?",
+        text: "This will generate a ticket and release the parking slot.",
+        icon: "question",
         showCancelButton: true,
-        confirmButtonText: 'Yes, Approve',
-        cancelButtonText: 'Cancel',
-        confirmButtonColor: '#3085d6',
-        cancelButtonColor: '#d33',
+        confirmButtonText: "Yes, approve",
+        cancelButtonText: "Cancel",
+        confirmButtonColor: "#00b8c4",
+        cancelButtonColor: "#64748b",
       });
 
       if (!result.isConfirmed) {
@@ -110,45 +121,32 @@ export default function AdminCheckouts() {
       }
 
       const response = await adminAPI.approveCheckout(checkoutId);
-      
+
       if (response.data.success) {
-        Swal.fire({
-          title: 'Success!',
-          text: `Checkout approved! Ticket #${response.data.data.ticket_number} generated and sent to user email.`,
-          icon: 'success',
-          confirmButtonText: 'OK',
-          confirmButtonColor: '#3085d6',
-        });
-        fetchPendingCheckouts(page); // Refresh list and stats
+        showSuccessToast("Approved", `Ticket #${response.data.data.ticket_number} generated successfully.`);
+        fetchPendingCheckouts(page);
       }
     } catch (error) {
       console.error("Approve failed:", error);
-      Swal.fire({
-        title: 'Error!',
-        text: 'Failed to approve checkout',
-        icon: 'error',
-        confirmButtonText: 'OK',
-        confirmButtonColor: '#d33',
-      });
+      showErrorToast("Failed to approve checkout");
     } finally {
       setActionLoading(null);
     }
   };
 
-  // Handle reject checkout
   const handleRejectCheckout = async (checkoutId) => {
     try {
       setActionLoading(checkoutId);
-      
+
       const result = await Swal.fire({
-        title: 'Reject Checkout?',
-        text: 'Are you sure you want to reject this checkout request?',
-        icon: 'warning',
+        title: "Reject checkout?",
+        text: "Are you sure you want to reject this checkout request?",
+        icon: "warning",
         showCancelButton: true,
-        confirmButtonText: 'Yes, Reject',
-        cancelButtonText: 'Cancel',
-        confirmButtonColor: '#d33',
-        cancelButtonColor: '#3085d6',
+        confirmButtonText: "Yes, reject",
+        cancelButtonText: "Cancel",
+        confirmButtonColor: "#dc2626",
+        cancelButtonColor: "#64748b",
       });
 
       if (!result.isConfirmed) {
@@ -157,428 +155,239 @@ export default function AdminCheckouts() {
       }
 
       const response = await adminAPI.rejectCheckout(checkoutId);
-      
+
       if (response.data.success) {
-        Swal.fire({
-          title: 'Success!',
-          text: 'Checkout request rejected successfully.',
-          icon: 'success',
-          confirmButtonText: 'OK',
-          confirmButtonColor: '#3085d6',
-        });
-        fetchPendingCheckouts(page); // Refresh list and stats
+        showSuccessToast("Rejected", "Checkout request rejected successfully.");
+        fetchPendingCheckouts(page);
       }
     } catch (error) {
       console.error("Reject failed:", error);
-      Swal.fire({
-        title: 'Error!',
-        text: 'Failed to reject checkout',
-        icon: 'error',
-        confirmButtonText: 'OK',
-        confirmButtonColor: '#d33',
-      });
+      showErrorToast("Failed to reject checkout");
     } finally {
       setActionLoading(null);
     }
   };
 
-  // Format date
+  const formatCurrency = (amount) => `BDT ${Number(amount || 0).toFixed(2)}`;
+
   const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
+    if (!dateString) return "N/A";
+    return new Date(dateString).toLocaleString("en-BD", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
     });
   };
 
-  // Calculate total time and charges
   const calculateTimeDetails = (booking) => {
     const scheduledEnd = new Date(booking.end_time);
     const actualEnd = new Date(booking.actual_end_time);
     const extraMinutes = Math.max(0, Math.ceil((actualEnd - scheduledEnd) / (1000 * 60)));
-    const roundedMinutes = Math.ceil(extraMinutes / 10) * 10;
-    
+
     return {
       extraMinutes,
-      roundedMinutes,
-      extraCharges: booking.extra_charges || 0
+      roundedMinutes: Math.ceil(extraMinutes / 10) * 10,
+      extraCharges: booking.extra_charges || 0,
     };
   };
 
+  const statCards = [
+    { label: "Pending Requests", value: stats.pending_requests, icon: <RiFileList3Line /> },
+    { label: "Awaiting Payment", value: stats.awaiting_payment, icon: <RiWallet3Line /> },
+    { label: "Ready Approval", value: stats.ready_for_approval, icon: <RiCheckDoubleLine /> },
+    { label: "Total Revenue", value: formatCurrency(stats.total_revenue), icon: <RiCoinsLine /> },
+  ];
+
+  const getStatusMeta = (checkout) => {
+    if (checkout.status === "checkout_requested" && Number(checkout.extra_charges || 0) > 0) {
+      return { label: "Payment Required", className: "is-pending", icon: <RiMoneyDollarCircleLine /> };
+    }
+    if (checkout.status === "checkout_requested") {
+      return { label: "Pending Review", className: "is-confirmed", icon: <RiTimeLine /> };
+    }
+    if (checkout.status === "checkout_paid") {
+      return { label: "Ready to Approve", className: "is-live", icon: <RiCheckDoubleLine /> };
+    }
+    return { label: checkout.status, className: "is-soft", icon: <RiFileList3Line /> };
+  };
+
   return (
-    <div className="container-fluid py-4">
-      <div className="card border-0 shadow-lg rounded-3 overflow-hidden">
-        {/* Header Section */}
-        <div className="card-header bg-gradient-primary text-white border-0 py-4 px-4">
-          <div className="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-3">
-            <div className="d-flex flex-column flex-sm-row gap-3 w-100 w-md-auto">
-              <form onSubmit={handleSearch} className="d-flex gap-2 flex-grow-1">
-                <div className="position-relative flex-grow-1">
-                  <i className="fas fa-search position-absolute top-50 start-0 translate-middle-y ms-3 text-muted"></i>
-                  <input 
-                    className="form-control form-control-lg border-0 rounded-pill ps-5 shadow-sm"
-                    placeholder="Search..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)} 
-                  />
-                </div>
-                <button 
-                  type="submit"
-                  className="btn btn-light btn-lg rounded-pill px-4 shadow-sm fw-semibold"
-                >
-                  <i className="fas fa-search me-2"></i>
-                  Search
-                </button>
-              </form>
-              
-              <button 
-                onClick={handleRefresh}
-                className="btn btn-light btn-lg rounded-pill px-4 shadow-sm fw-semibold"
-              >
-                <i className="fas fa-sync-alt me-2"></i>
-                Refresh
-              </button>
-            </div>
-          </div>
+    <section className="parking-admin-page service-admin-page checkout-admin-page">
+      <div className="parking-admin-hero">
+        <div>
+          <h1>Parking Checkouts</h1>
         </div>
-
-        {/* Stats Cards - Database Data */}
-        <div className="card-body border-bottom">
-          <div className="row g-3">
-            <div className="col-xl-3 col-md-3">
-              <div className="card border-0 shadow-sm bg-primary text-white h-100">
-                <div className="card-body">
-                  <div className="d-flex align-items-center">
-                    <div className="flex-grow-1">
-                      <h6 className="card-title text-white-50 mb-2">Pending Requests</h6>
-                      <h3 className="fw-bold mb-0">{stats.pending_requests}</h3>
-                    </div>
-                    <div className="flex-shrink-0">
-                      <i className="fas fa-clock fa-2x opacity-50"></i>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-            
-            <div className="col-xl-3 col-md-3">
-              <div className="card border-0 shadow-sm bg-warning text-dark h-100">
-                <div className="card-body">
-                  <div className="d-flex align-items-center">
-                    <div className="flex-grow-1">
-                      <h6 className="card-title text-dark-50 mb-2">Awaiting Payment</h6>
-                      <h3 className="fw-bold mb-0">{stats.awaiting_payment}</h3>
-                    </div>
-                    <div className="flex-shrink-0">
-                      <i className="fas fa-money-bill-wave fa-2x opacity-50"></i>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="col-xl-3 col-md-3">
-              <div className="card border-0 shadow-sm bg-info text-white h-100">
-                <div className="card-body">
-                  <div className="d-flex align-items-center">
-                    <div className="flex-grow-1">
-                      <h6 className="card-title text-white-50 mb-2">Ready for Approval</h6>
-                      <h3 className="fw-bold mb-0">{stats.ready_for_approval}</h3>
-                    </div>
-                    <div className="flex-shrink-0">
-                      <i className="fas fa-check-circle fa-2x opacity-50"></i>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="col-xl-3 col-md-3">
-              <div className="card border-0 shadow-sm bg-success text-white h-100">
-                <div className="card-body">
-                  <div className="d-flex align-items-center">
-                    <div className="flex-grow-1">
-                      <h6 className="card-title text-white-50 mb-2">Total Revenue</h6>
-                      <h3 className="fw-bold mb-0">
-                        BDT {stats.total_revenue.toFixed(2)}
-                      </h3>
-                    </div>
-                    <div className="flex-shrink-0">
-                      <i className="fas fa-coins fa-2x opacity-50"></i>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Table Section */}
-        <div className="card-body p-0">
-          {loading ? (
-            <div className="text-center py-5 my-5">
-              <div className="spinner-grow text-primary mb-4" style={{width: '3rem', height: '3rem'}} role="status">
-                <span className="visually-hidden">Loading...</span>
-              </div>
-              <h5 className="text-muted mb-2">Loading Checkouts Data</h5>
-              <p className="text-muted">Please wait while we fetch checkout information</p>
-            </div>
-          ) : checkouts.length === 0 ? (
-            <div className="text-center py-5 my-5">
-              <div className="bg-light rounded-3 p-5 mx-auto" style={{maxWidth: '400px'}}>
-                <i className="fas fa-check-circle fa-4x text-muted mb-4"></i>
-                <h4 className="text-muted mb-3">No Pending Checkouts</h4>
-                <p className="text-muted mb-4">
-                  {searchTerm ? 'No checkouts match your search criteria. Try different keywords.' : 'All checkout requests have been processed.'}
-                </p>
-                {searchTerm && (
-                  <button 
-                    onClick={handleRefresh}
-                    className="btn btn-primary rounded-pill px-4"
-                  >
-                    <i className="fas fa-times me-2"></i>
-                    Clear Search
-                  </button>
-                )}
-              </div>
-            </div>
-          ) : (
-            <div className="table-responsive">
-              <table className="table table-hover align-middle mb-0">
-                <thead className="table-light">
-                  <tr>
-                    <th className="text-center border-0 py-4 fw-bold text-uppercase text-muted small bg-light">Booking ID</th>
-                    <th className="text-center border-0 py-4 fw-bold text-uppercase text-muted small bg-light">User Details</th>
-                    <th className="text-center border-0 py-4 fw-bold text-uppercase text-muted small bg-light">Parking & Slot</th>
-                    <th className="text-center border-0 py-4 fw-bold text-uppercase text-muted small bg-light">Duration</th>
-                    <th className="text-center border-0 py-4 fw-bold text-uppercase text-muted small bg-light">Charges</th>
-                    <th className="text-center border-0 py-4 fw-bold text-uppercase text-muted small bg-light">Status</th>
-                    <th className="text-center border-0 py-4 fw-bold text-uppercase text-muted small bg-light">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {checkouts.map((checkout) => {
-                    const timeDetails = calculateTimeDetails(checkout);
-                    
-                    return (
-                      <tr key={checkout.id} className="border-top border-light">
-                        <td className="text-center py-4">
-                          <span className="fw-bold text-primary fs-6">#{checkout.id}</span>
-                          <br />
-                          <small className="text-muted">
-                            {formatDate(checkout.created_at)}
-                          </small>
-                        </td>
-                        
-                        <td className="text-center py-4">
-                          <div className="d-flex flex-column align-items-center">
-                            <span className="fw-semibold text-dark mb-1">{checkout.user?.name}</span>
-                            <small className="text-muted">{checkout.user?.email}</small>
-                          </div>
-                        </td>
-                        
-                        <td className="text-center py-4">
-                          <div className="d-flex flex-column align-items-center">
-                            <span className="fw-semibold text-dark mb-1">{checkout.parking?.name}</span>
-                            <span className="badge bg-secondary px-3 py-2">
-                              Slot: {checkout.slot?.slot_code}
-                            </span>
-                            <small className="text-muted mt-1">
-                              {checkout.parking?.distance}
-                            </small>
-                          </div>
-                        </td>
-                        
-                        <td className="text-center py-4">
-                          <div className="d-flex flex-column align-items-center">
-                            <small className="fw-semibold">
-                              <strong>Booked:</strong> {checkout.hours} hour(s)
-                            </small>
-                            <small className="text-muted">
-                              <strong>Ends:</strong> {formatDate(checkout.end_time)}
-                            </small>
-                            <small className="text-muted">
-                              <strong>Actual End:</strong> {formatDate(checkout.actual_end_time)}
-                            </small>
-                            {timeDetails.extraMinutes > 0 && (
-                              <small className="text-warning fw-semibold">
-                                <strong>Extra:</strong> {timeDetails.extraMinutes} min
-                              </small>
-                            )}
-                          </div>
-                        </td>
-                        
-                        <td className="text-center py-4">
-                          <div className="d-flex flex-column align-items-center">
-                            <span className="fw-bold text-success fs-6">
-                              BDT {parseFloat(checkout.total_price).toFixed(2)}
-                            </span>
-                            {checkout.extra_charges > 0 && (
-                              <small className="text-warning fw-semibold">
-                                + BDT {parseFloat(checkout.extra_charges).toFixed(2)}
-                              </small>
-                            )}
-                            <span className="fw-bold text-primary">
-                              Total: BDT {(parseFloat(checkout.total_price) + parseFloat(checkout.extra_charges || 0)).toFixed(2)}
-                            </span>
-                          </div>
-                        </td>
-                        
-                        <td className="text-center py-4">
-                          <span className={`badge ${
-                            checkout.status === 'checkout_requested' && checkout.extra_charges > 0 
-                              ? 'bg-warning' 
-                              : checkout.status === 'checkout_requested' 
-                                ? 'bg-info'
-                                : checkout.status === 'checkout_paid'
-                                  ? 'bg-success'
-                                  : 'bg-secondary'
-                          } px-3 py-2`}>
-                            <i className={`fas ${
-                              checkout.status === 'checkout_requested' && checkout.extra_charges > 0 
-                                ? 'fa-money-bill-wave' 
-                                : checkout.status === 'checkout_requested'
-                                  ? 'fa-clock'
-                                  : checkout.status === 'checkout_paid'
-                                    ? 'fa-check-circle'
-                                    : 'fa-info-circle'
-                            } me-2`}></i>
-                            {checkout.status === 'checkout_requested' && checkout.extra_charges > 0 
-                              ? 'Payment Required' 
-                              : checkout.status === 'checkout_requested'
-                                ? 'Pending Review'
-                                : checkout.status === 'checkout_paid'
-                                  ? 'Ready to Approve'
-                                  : checkout.status
-                            }
-                          </span>
-                        </td>
-                        
-                        <td className="text-center py-4">
-                          <div className="d-flex justify-content-center gap-2">
-                            {/* Approve Button */}
-                            <button
-                              className="btn btn-success btn-sm rounded-pill px-3"
-                              onClick={() => handleApproveCheckout(checkout.id)}
-                              disabled={actionLoading === checkout.id}
-                              title="Approve checkout and generate ticket"
-                            >
-                              {actionLoading === checkout.id ? (
-                                <span className="spinner-border spinner-border-sm me-1" />
-                              ) : (
-                                <i className="fas fa-check me-1"></i>
-                              )}
-                              Approve
-                            </button>
-                            
-                            {/* Reject Button */}
-                            {(checkout.status === 'checkout_requested' || checkout.status === 'checkout_paid') && (
-                              <button
-                                className="btn btn-danger btn-sm rounded-pill px-3"
-                                onClick={() => handleRejectCheckout(checkout.id)}
-                                disabled={actionLoading === checkout.id}
-                                title="Reject checkout request"
-                              >
-                                {actionLoading === checkout.id ? (
-                                  <span className="spinner-border spinner-border-sm me-1" />
-                                ) : (
-                                  <i className="fas fa-times me-1"></i>
-                                )}
-                                Reject
-                              </button>
-                            )}
-                          </div>
-                          
-                          {/* Status specific messages */}
-                          {checkout.status === 'checkout_requested' && checkout.extra_charges > 0 && (
-                            <small className="text-warning d-block mt-1">
-                              User needs to pay extra charges first
-                            </small>
-                          )}
-                          
-                          {checkout.status === 'checkout_paid' && (
-                            <small className="text-success d-block mt-1">
-                              All payments completed
-                            </small>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-
-        {/* Pagination */}
-        {meta.last_page > 1 && !loading && (
-          <div className="card-footer bg-white border-0 py-4 px-4">
-            <div className="d-flex flex-column flex-lg-row justify-content-between align-items-center gap-4">
-              <div className="text-muted fw-semibold">
-                Displaying <span className="text-primary fw-bold">{((meta.current_page - 1) * meta.per_page) + 1}</span> to{" "}
-                <span className="text-primary fw-bold">{Math.min(meta.current_page * meta.per_page, meta.total)}</span> of{" "}
-                <span className="text-primary fw-bold">{meta.total}</span> checkout requests
-              </div>
-              
-              <div className="d-flex gap-3">
-                <button 
-                  className="btn btn-outline-primary btn-lg rounded-pill px-4 fw-semibold d-flex align-items-center" 
-                  disabled={meta.current_page <= 1} 
-                  onClick={() => setPage(page - 1)}
-                >
-                  <i className="fas fa-chevron-left me-2"></i>
-                  Previous Page
-                </button>
-                <button 
-                  className="btn btn-outline-primary btn-lg rounded-pill px-4 fw-semibold d-flex align-items-center" 
-                  disabled={meta.current_page >= meta.last_page} 
-                  onClick={() => setPage(page + 1)}
-                >
-                  Next Page
-                  <i className="fas fa-chevron-right ms-2"></i>
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+        <button className="pa-btn pa-btn-ghost" type="button" onClick={handleRefresh}>
+          <RiRefreshLine /> Refresh
+        </button>
       </div>
 
-      {/* Additional Info Section */}
-      {checkouts.length > 0 && (
-        <div className="card border-0 shadow-sm mt-4">
-          <div className="card-header bg-light">
-            <h6 className="mb-0">
-              <i className="fas fa-info-circle me-2 text-primary"></i>
-              Checkout Process Information
-            </h6>
-          </div>
-          <div className="card-body">
-            <div className="row">
-              <div className="col-md-4">
-                <h6>🟡 Payment Required</h6>
-                <p className="text-muted small">
-                  User has extra charges to pay before approval
-                </p>
-              </div>
-              <div className="col-md-4">
-                <h6>🔵 Pending Review</h6>
-                <p className="text-muted small">
-                  Checkout request submitted, waiting for admin review
-                </p>
-              </div>
-              <div className="col-md-4">
-                <h6>🟢 Ready to Approve</h6>
-                <p className="text-muted small">
-                  All payments completed, ready for final approval
-                </p>
-              </div>
+      <div className="checkout-stat-grid">
+        {statCards.map((card) => (
+          <article className="pa-stat-card" key={card.label}>
+            <div>
+              <span>{card.label}</span>
+              <strong>{card.value}</strong>
             </div>
+            {card.icon}
+          </article>
+        ))}
+      </div>
+
+      <AdminFilterBar
+        searchValue={searchTerm}
+        searchPlaceholder="Search checkout request, user, parking, or slot"
+        onSearchChange={handleSearchChange}
+        filters={[
+          {
+            id: "status",
+            label: "Checkout Status",
+            value: statusFilter,
+            onChange: (value) => {
+              setStatusFilter(value);
+              setPage(1);
+            },
+            options: [
+              { value: "", label: "All Status" },
+              { value: "pending_review", label: "Pending Review" },
+              { value: "payment_required", label: "Payment Required" },
+              { value: "ready_approval", label: "Ready Approval" },
+            ],
+          },
+        ]}
+      />
+
+      
+
+      <div className="pa-panel">
+        {loading ? (
+          <div className="pa-empty-state">Loading checkout requests...</div>
+        ) : checkouts.length === 0 ? (
+          <div className="pa-empty-state">
+            <RiInboxLine />
+            <h3>No pending checkouts</h3>
+            <p>{searchTerm || statusFilter ? "No checkouts match your filters." : "All checkout requests have been processed."}</p>
+            {(searchTerm || statusFilter) && (
+              <button className="pa-btn pa-btn-primary" type="button" onClick={handleRefresh}>
+                Clear Filters
+              </button>
+            )}
           </div>
-        </div>
-      )}
-    </div>
+        ) : (
+          <div className="pa-table-wrap">
+            <table className="pa-table checkout-table">
+              <thead>
+                <tr>
+                  <th>Booking</th>
+                  <th>User</th>
+                  <th>Parking & Slot</th>
+                  <th>Duration</th>
+                  <th>Charges</th>
+                  <th>Status</th>
+                  <th className="checkout-actions-col">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {checkouts.map((checkout) => {
+                  const timeDetails = calculateTimeDetails(checkout);
+                  const status = getStatusMeta(checkout);
+                  const totalPrice = Number(checkout.total_price || 0);
+                  const extraCharges = Number(checkout.extra_charges || 0);
+
+                  return (
+                    <tr key={checkout.id}>
+                      <td>
+                        <strong>#{checkout.id}</strong>
+                        <span className="pa-cell-note">
+                          <RiCalendarCheckLine /> {formatDate(checkout.created_at)}
+                        </span>
+                      </td>
+                      <td>
+                        <span className="pa-icon-text"><RiUser3Line /> {checkout.user?.name || "N/A"}</span>
+                        <span className="pa-cell-note">{checkout.user?.email || "N/A"}</span>
+                      </td>
+                      <td>
+                        <span className="pa-icon-text"><RiParkingBoxLine /> {checkout.parking?.name || "N/A"}</span>
+                        <span className="pa-slot-code">Slot: {checkout.slot?.slot_code || "N/A"}</span>
+                        {checkout.parking?.distance && (
+                          <span className="pa-cell-note"><RiMapPinLine /> {checkout.parking.distance}</span>
+                        )}
+                      </td>
+                      <td>
+                        <div className="checkout-time-stack">
+                          <span><strong>Booked:</strong> {checkout.hours} hour(s)</span>
+                          <span><strong>Ends:</strong> {formatDate(checkout.end_time)}</span>
+                          <span><strong>Actual:</strong> {formatDate(checkout.actual_end_time)}</span>
+                          {timeDetails.extraMinutes > 0 && (
+                            <span className="checkout-extra-time">Extra: {timeDetails.extraMinutes} min</span>
+                          )}
+                        </div>
+                      </td>
+                      <td>
+                        <div className="checkout-charge-stack">
+                          <strong>{formatCurrency(totalPrice)}</strong>
+                          {extraCharges > 0 && <span>+ {formatCurrency(extraCharges)}</span>}
+                          <em>Total: {formatCurrency(totalPrice + extraCharges)}</em>
+                        </div>
+                      </td>
+                      <td>
+                        <span className={`pa-status ${status.className}`}>
+                          {status.icon} {status.label}
+                        </span>
+                      </td>
+                      <td>
+                        <div className="pa-row-actions checkout-row-actions">
+                          <button
+                            className="pa-mini-btn is-confirm"
+                            type="button"
+                            onClick={() => handleApproveCheckout(checkout.id)}
+                            disabled={actionLoading === checkout.id}
+                            title="Approve checkout and generate ticket"
+                          >
+                            <RiCheckDoubleLine /> Approve
+                          </button>
+
+                          {(checkout.status === "checkout_requested" || checkout.status === "checkout_paid") && (
+                            <button
+                              className="pa-mini-btn is-cancelled"
+                              type="button"
+                              onClick={() => handleRejectCheckout(checkout.id)}
+                              disabled={actionLoading === checkout.id}
+                              title="Reject checkout request"
+                            >
+                              <RiCloseCircleLine /> Reject
+                            </button>
+                          )}
+                        </div>
+
+                        {checkout.status === "checkout_requested" && extraCharges > 0 && (
+                          <span className="checkout-action-note is-warning">User needs to pay extra charges first</span>
+                        )}
+                        {checkout.status === "checkout_paid" && (
+                          <span className="checkout-action-note is-success">All payments completed</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {!loading && (
+          <AdminPagination
+            currentPage={meta.current_page}
+            lastPage={meta.last_page}
+            perPage={meta.per_page}
+            total={meta.total}
+            label="checkout requests"
+            onPageChange={setPage}
+          />
+        )}
+      </div>
+    </section>
   );
 }

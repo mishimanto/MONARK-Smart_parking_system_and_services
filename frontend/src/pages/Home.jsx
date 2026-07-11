@@ -45,6 +45,10 @@ const getImageUrl = (image, type = "parking", index = 0) => {
         return trimmedImage;
     }
 
+    if (trimmedImage.startsWith("images/") && !trimmedImage.startsWith("images/parkings/") && !trimmedImage.startsWith("images/services/")) {
+        return `/${trimmedImage}`;
+    }
+
     const imagePath = trimmedImage.replace(/^\/+/, "");
     return `${BASE_URL}/${imagePath}`;
 };
@@ -53,6 +57,34 @@ const handleImageError = (event, type, index = 0) => {
     const fallback = getFallbackImage(type, index);
     if (event.currentTarget.src.endsWith(fallback)) return;
     event.currentTarget.src = fallback;
+};
+
+const getCurrentLocation = () =>
+    new Promise((resolve) => {
+        if (!navigator.geolocation) {
+            resolve(null);
+            return;
+        }
+
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                resolve({
+                    latitude: position.coords.latitude,
+                    longitude: position.coords.longitude,
+                });
+            },
+            () => resolve(null),
+            { enableHighAccuracy: true, timeout: 8000, maximumAge: 120000 }
+        );
+    });
+
+const formatParkingDistance = (spot) => {
+    const distance = Number(spot.calculated_distance);
+    if (!Number.isNaN(distance) && distance >= 0) {
+        return distance < 1 ? `${Math.round(distance * 1000)} m from you` : `${distance.toFixed(1)} km from you`;
+    }
+
+    return spot.distance || 'Premium Location';
 };
 
 const heroImages = [
@@ -113,8 +145,15 @@ export default function LandingPage() {
             setCurrentSlide((prev) => (prev + 1) % heroImages.length);
         }, 5000);
 
-        // Fetch parking spots
-        fetch(`${BASE_URL}/api/parkings`)
+        getCurrentLocation().then((location) => {
+            const params = new URLSearchParams({ page: "1", per_page: "6" });
+            if (location) {
+                params.set("latitude", location.latitude);
+                params.set("longitude", location.longitude);
+            }
+
+            // Fetch parking spots
+            fetch(`${BASE_URL}/api/parkings?${params.toString()}`)
             .then(res => res.json())
             .then(data => {
                 const processedParkings = Array.isArray(data) ? data : (data.data || []);
@@ -122,10 +161,11 @@ export default function LandingPage() {
                     ...parking,
                     image: getImageUrl(parking.image, "parking", index)
                 }));
-                const latestParkings = processedWithUrls.slice(0, 3);
+                const latestParkings = processedWithUrls.slice(0, 6);
                 setParkingSpots(latestParkings);
             })
             .catch(err => console.error("Error fetching parkings:", err));
+        });
 
         // Fetch services
         fetch(`${BASE_URL}/api/services`)
@@ -136,7 +176,7 @@ export default function LandingPage() {
                     ...service,
                     image: getImageUrl(service.image, "service", index)
                 }));
-                const featuredServices = processedServices.slice(0, 3);
+                const featuredServices = processedServices.slice(0, 9);
                 setServices(featuredServices);
                 setLoading(false);
             })
@@ -152,12 +192,14 @@ export default function LandingPage() {
         setCurrentSlide(index);
     };
 
-    const handleParkingSpotClick = (spotId) => {
-        navigate(`/parking/${spotId}`);
+    const parkingPath = (spot) => `/parking/${spot.slug || spot.id}`;
+
+    const handleParkingSpotClick = (spot) => {
+        navigate(parkingPath(spot));
     };
 
-    const handleServiceClick = () => {
-        navigate(`/services`);
+    const handleServiceClick = (serviceId) => {
+        navigate(`/services/${serviceId}`);
     };
 
     const handleViewAllServices = () => {
@@ -166,6 +208,15 @@ export default function LandingPage() {
 
     const handleViewAllParkings = () => {
         navigate("/all-parkings");
+    };
+
+    const openParkingMap = (spot) => {
+        const destination = spot.latitude && spot.longitude
+            ? `${spot.latitude},${spot.longitude}`
+            : encodeURIComponent(`${spot.name} ${spot.address || spot.distance || ""} parking`);
+        const mapUrl = `https://www.google.com/maps/dir/?api=1&destination=${destination}`;
+
+        window.open(mapUrl, "_blank", "noopener,noreferrer");
     };
 
     return (
@@ -300,7 +351,7 @@ export default function LandingPage() {
                                 <div key={spot.id} className="col-lg-4 col-md-6 p-4">
                                     <div 
                                         className="home-parking-card h-100"
-                                        onClick={() => handleParkingSpotClick(spot.id)}
+                                        onClick={() => handleParkingSpotClick(spot)}
                                     >
                                         <div className="home-card-image">
                                             <img 
@@ -319,10 +370,17 @@ export default function LandingPage() {
                                                     }
                                                 </span>
                                             </div>
-                                            <div className="home-distance-badge">
+                                            <button
+                                                type="button"
+                                                className="home-distance-badge home-distance-link"
+                                                onClick={(event) => {
+                                                    event.stopPropagation();
+                                                    openParkingMap(spot);
+                                                }}
+                                            >
                                                 <FaDirections className="me-1" />
-                                                {spot.distance || 'Premium Location'}
-                                            </div>
+                                                {formatParkingDistance(spot)}
+                                            </button>
                                         </div>
                                         <div className="home-card-body">
                                             <div className="d-flex justify-content-between align-items-center mb-3">
@@ -408,7 +466,6 @@ export default function LandingPage() {
                                     <div key={service.id} className="col-lg-4 col-md-6 p-4">
                                         <div 
                                             className="home-service-card h-100"
-                                            onClick={() => handleServiceClick(service.id)}
                                         >
                                             <div className="home-service-image">
                                                 <img 
@@ -426,23 +483,35 @@ export default function LandingPage() {
                                                 </div>
                                             </div>
                                             <div className="home-service-content">
-                                                <h5 className="home-service-title">{service.name}</h5>
-                                                <p className="home-service-description">
-                                                    {service.description}
-                                                </p>
-                                                <div className="home-service-meta">
-                                                    <div className="home-service-duration">
-                                                        <RiTimeLine className="me-2" />
-                                                        <span>{service.duration || "Flexible timing"}</span>
-                                                    </div>
+                                                <div className="home-service-heading">
+                                                    <button type="button" className="home-service-title home-service-title-link" onClick={() => handleServiceClick(service.id)}>
+                                                        {service.name}
+                                                    </button>
                                                     <div className="home-service-rating">
                                                         <RiStarSFill className="me-1" />
                                                         <span>4.5</span>
                                                     </div>
                                                 </div>
-                                                <div className="home-service-footer">
-                                                    <button className="home-btn-neon-primary">
-                                                        Book This Service
+                                                <p className="home-service-description">
+                                                    {service.description}
+                                                </p>
+
+                                                <div className="home-service-action-row">
+                                                    <div className="home-service-details">
+                                                        <div className="home-service-duration">
+                                                            <RiTimeLine className="me-2" />
+                                                            <span>{service.duration || "Flexible timing"}</span>
+                                                        </div>
+                                                    </div>
+
+                                                    <button
+                                                        className="home-btn-neon-primary"
+                                                        onClick={(event) => {
+                                                            event.stopPropagation();
+                                                            handleServiceClick(service.id);
+                                                        }}
+                                                    >
+                                                        Book Now
                                                     </button>
                                                 </div>
                                             </div>

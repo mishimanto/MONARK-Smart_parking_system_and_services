@@ -28,9 +28,13 @@ class Booking extends Model
 
     protected $casts = [
         'end_time' => 'datetime',
+        'actual_end_time' => 'datetime',
         'total_price' => 'decimal:2',
         'extra_charges' => 'decimal:2',
-        'grand_total' => 'decimal:2', 
+        'grand_total' => 'decimal:2',
+        'checkout_requested' => 'boolean',
+        'checkout_approved' => 'boolean',
+        'ticket_generated' => 'boolean',
     ];
 
     public function user()

@@ -7,6 +7,7 @@ import {
   FaPhone,
 } from "react-icons/fa";
 import { API_BASE_URL } from "../api/client";
+import { showErrorToast, showSuccessToast } from "../utils/toast";
 import "./css/Contact.css";
 
 const getDefaultContactData = () => ({
@@ -87,7 +88,7 @@ export default function Contact() {
         throw new Error(result.error || 'Failed to send message');
       }
 
-      alert(result.message || "Message sent successfully!");
+      showSuccessToast("Message sent", result.message || "Message sent successfully!");
       setForm({ 
         name: "", 
         email: "", 
@@ -97,7 +98,7 @@ export default function Contact() {
       
     } catch (err) {
       console.error("Error sending message:", err);
-      alert(err.message || "Failed to send message. Please try again.");
+      showErrorToast("Failed to send message", err.message || "Please try again.");
     } finally {
       setIsSubmitting(false);
     }
@@ -138,16 +139,8 @@ export default function Contact() {
             </div>
 
             <div className="contact-support-note">
-              <FaClock />
-              <span>Our support team will respond soon.</span>
-            </div>
-
-            {contact.map_embed && (
-              <div className="contact-map-panel">
-                <h3>Find Us Here</h3>
-                <div ref={mapContainerRef} className="contact-map" />
-              </div>
-            )}
+              <span>Our support team available from 9:00 AM to 9:00 PM.</span>
+            </div>            
           </aside>
 
           <section className="contact-form-card">
@@ -159,7 +152,7 @@ export default function Contact() {
                   name="name"
                   value={form.name}
                   onChange={handleChange}
-                  placeholder="Your full name *"
+                  placeholder="Your full name"
                   required
                 />
                 <input
@@ -168,7 +161,7 @@ export default function Contact() {
                   type="email"
                   value={form.email}
                   onChange={handleChange}
-                  placeholder="Your email address *"
+                  placeholder="Your email address"
                   required
                 />
               </div>
@@ -178,7 +171,7 @@ export default function Contact() {
                 name="subject"
                 value={form.subject}
                 onChange={handleChange}
-                placeholder="Subject *"
+                placeholder="Subject"
                 required
               />
 
@@ -187,7 +180,7 @@ export default function Contact() {
                 name="message"
                 value={form.message}
                 onChange={handleChange}
-                placeholder="Your message *"
+                placeholder="Your message"
                 required
               />
 
@@ -206,6 +199,14 @@ export default function Contact() {
               </button>
             </form>
           </section>
+        </section>
+        <section className="contact-form-card mt-5">
+          {contact.map_embed && (
+              <div className="contact-map-panel">
+                <h3>Find Us Here</h3>
+                <div ref={mapContainerRef} className="contact-map mt-3" />
+              </div>
+            )}
         </section>
       </div>
     </main>

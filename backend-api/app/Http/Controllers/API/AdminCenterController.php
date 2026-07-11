@@ -4,8 +4,9 @@ namespace App\Http\Controllers\API;
 
 use App\Http\Controllers\Controller;
 use App\Models\ServiceCenter;
+use App\Services\ImageUploadService;
+use App\Support\CacheKeys;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 
 class AdminCenterController extends Controller
@@ -34,12 +35,17 @@ class AdminCenterController extends Controller
                 $query->where('is_active', $request->status);
             }
             
-            // Order by latest first
-            $serviceCenters = $query->latest()->paginate(10);
+            $perPage = $request->get('per_page', 10);
+            $serviceCenters = $query->latest()->paginate($perPage);
             
             return response()->json([
                 'success' => true,
                 'data' => $serviceCenters,
+                'stats' => [
+                    'total' => ServiceCenter::count(),
+                    'active' => ServiceCenter::where('is_active', true)->count(),
+                    'inactive' => ServiceCenter::where('is_active', false)->count(),
+                ],
                 'message' => 'Service centers retrieved successfully'
             ]);
             
@@ -65,7 +71,7 @@ class AdminCenterController extends Controller
                 'latitude' => 'required|numeric|between:-90,90',
                 'longitude' => 'required|numeric|between:-180,180',
                 'opening_hours' => 'nullable|string|max:100',
-                'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
+                'image' => $request->hasFile('image') ? 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048' : 'nullable|string|max:500',
                 'is_active' => 'boolean'
             ]);
 
@@ -79,13 +85,20 @@ class AdminCenterController extends Controller
 
             $data = $request->all();
             
-            // Handle image upload
             if ($request->hasFile('image')) {
-                $imagePath = $request->file('image')->store('service-centers', 'public');
-                $data['image'] = 'storage/' . $imagePath;
+                $uploaded = app(ImageUploadService::class)->storePublicImage($request->file('image'), 'service-centers', [
+                    'prefix' => 'service-center',
+                    'width' => 1280,
+                    'height' => 820,
+                    'fit' => 'cover',
+                    'quality' => 82,
+                ]);
+                $data['image'] = $uploaded['url'];
             }
 
             $serviceCenter = ServiceCenter::create($data);
+
+            CacheKeys::bump('public-service-centers');
 
             return response()->json([
                 'success' => true,
@@ -153,7 +166,7 @@ class AdminCenterController extends Controller
                 'latitude' => 'sometimes|required|numeric|between:-90,90',
                 'longitude' => 'sometimes|required|numeric|between:-180,180',
                 'opening_hours' => 'nullable|string|max:100',
-                'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
+                'image' => $request->hasFile('image') ? 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048' : 'nullable|string|max:500',
                 'is_active' => 'boolean'
             ]);
 
@@ -167,18 +180,21 @@ class AdminCenterController extends Controller
 
             $data = $request->all();
             
-            // Handle image upload
             if ($request->hasFile('image')) {
-                // Delete old image if exists
-                if ($serviceCenter->image && Storage::disk('public')->exists(str_replace('storage/', '', $serviceCenter->image))) {
-                    Storage::disk('public')->delete(str_replace('storage/', '', $serviceCenter->image));
-                }
-                
-                $imagePath = $request->file('image')->store('service-centers', 'public');
-                $data['image'] = 'storage/' . $imagePath;
+                app(ImageUploadService::class)->deletePublicImage($serviceCenter->image);
+                $uploaded = app(ImageUploadService::class)->storePublicImage($request->file('image'), 'service-centers', [
+                    'prefix' => 'service-center',
+                    'width' => 1280,
+                    'height' => 820,
+                    'fit' => 'cover',
+                    'quality' => 82,
+                ]);
+                $data['image'] = $uploaded['url'];
             }
 
             $serviceCenter->update($data);
+
+            CacheKeys::bump('public-service-centers');
 
             return response()->json([
                 'success' => true,
@@ -209,12 +225,11 @@ class AdminCenterController extends Controller
                 ], 404);
             }
 
-            // Delete associated image
-            if ($serviceCenter->image && Storage::disk('public')->exists(str_replace('storage/', '', $serviceCenter->image))) {
-                Storage::disk('public')->delete(str_replace('storage/', '', $serviceCenter->image));
-            }
+            app(ImageUploadService::class)->deletePublicImage($serviceCenter->image);
 
             $serviceCenter->delete();
+
+            CacheKeys::bump('public-service-centers');
 
             return response()->json([
                 'success' => true,
@@ -247,6 +262,8 @@ class AdminCenterController extends Controller
             $serviceCenter->update([
                 'is_active' => !$serviceCenter->is_active
             ]);
+
+            CacheKeys::bump('public-service-centers');
 
             return response()->json([
                 'success' => true,

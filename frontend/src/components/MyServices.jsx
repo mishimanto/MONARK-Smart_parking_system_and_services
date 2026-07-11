@@ -24,8 +24,6 @@ export default function MyServices() {
       }
     })
       .then(res => {
-        console.log("API Response:", res.data);
-        
         if (Array.isArray(res.data)) {
           setOrders(res.data);
         } else {

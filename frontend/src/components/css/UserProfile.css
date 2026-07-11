@@ -1,10 +1,9 @@
 .profile-page {
-  min-height: 100vh;
   background:
-    linear-gradient(180deg, rgba(0, 247, 255, 0.055), transparent 300px),
-    #080d22;
+    radial-gradient(circle at 18% 0%, rgba(0, 247, 255, 0.13), transparent 28%),
+    linear-gradient(180deg, #080d22 0%, #060a1c 100%);
   color: #ffffff;
-  padding: 48px 16px 78px;
+  padding: 40px 20px;
 }
 
 .profile-shell {
@@ -24,10 +23,10 @@
 .profile-summary-card,
 .profile-side-card,
 .profile-card {
-  border: 1px solid rgba(0, 247, 255, 0.18);
-  border-radius: 4px;
-  background: #10162d;
-  box-shadow: 0 22px 52px rgba(0, 0, 0, 0.26);
+  border: 1px solid rgba(0, 247, 255, 0.16);
+  border-radius: 6px;
+  background: linear-gradient(180deg, rgba(18, 26, 52, 0.96), rgba(12, 18, 39, 0.98));
+  box-shadow: 0 22px 54px rgba(0, 0, 0, 0.3);
 }
 
 .profile-hero > div:first-child {
@@ -69,7 +68,7 @@
 
 .profile-summary-card h2,
 .profile-side-card h2 {
-  margin: 0 0 6px;
+
   color: #ffffff;
   font-size: 20px;
   font-weight: 900;
@@ -82,19 +81,61 @@
   height: 62px;
   align-items: center;
   justify-content: center;
-  border: 1px solid rgba(0, 247, 255, 0.32);
-  border-radius: 4px;
-  background: #00f7ff;
+  overflow: hidden;
+  border: 1px solid rgba(0, 247, 255, 0.42);
+  border-radius: 6px;
+  background: linear-gradient(135deg, #00f7ff, #20d7ff);
   color: #020617;
   font-size: 24px;
   font-weight: 900;
+  box-shadow: 0 18px 44px rgba(0, 247, 255, 0.18);
+}
+
+.profile-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .profile-avatar.large {
-  width: 84px;
-  height: 84px;
-  margin-bottom: 18px;
-  font-size: 34px;
+  width: 118px;
+  height: 118px;
+  font-size: 44px;
+}
+
+.profile-avatar-wrap {
+  display: grid;
+  place-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.profile-avatar-upload {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  text-decoration: underline;
+  color: #c9faff;
+  padding: 0 4px;
+  font-size: 13px;
+  font-weight: 900;
+  cursor: pointer;
+  transition: border-color 0.2s ease, background 0.2s ease, color 0.2s ease;
+}
+
+.profile-avatar-upload:hover {
+  border-color: rgba(0, 247, 255, 0.68);
+  background: rgba(0, 247, 255, 0.14);
+  color: #ffffff;
+}
+
+.profile-avatar-upload input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
 }
 
 .profile-alert {
@@ -129,42 +170,57 @@
 
 .profile-layout {
   display: grid;
-  grid-template-columns: 500px minmax(0, 1fr);
+  grid-template-columns: 360px minmax(0, 1fr);
   gap: 22px;
   align-items: start;
 }
 
 .profile-side-card,
 .profile-card {
-  padding: 24px;
+  padding: 26px;
 }
 
 .profile-side-card {
   position: sticky;
   top: 124px;
+  text-align: center;
 }
 
 .profile-side-meta {
   display: grid;
   gap: 12px;
-  margin-top: 24px;
+  margin-top: 10px;
 }
 
 .profile-side-meta > div {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
   border: 1px solid rgba(0, 247, 255, 0.13);
-  border-radius: 4px;
-  background: #151d34;
-  padding: 14px;
+  border-radius: 6px;
+  background: rgba(21, 29, 52, 0.86);
+  padding: 10px;
 }
 
-.profile-side-meta svg {
+.profile-meta-icon {
+  display: inline-flex;
+  width: 42px;
+  height: 42px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(0, 247, 255, 0.22);
+  border-radius: 4px;
+  background: rgba(0, 247, 255, 0.08);
+}
+
+.profile-meta-icon svg {
   color: #00f7ff;
   font-size: 22px;
 }
 
 .profile-side-meta strong {
   display: block;
-  margin-top: 8px;
   color: #ffffff;
   font-size: 16px;
   font-weight: 900;
@@ -175,7 +231,7 @@
   gap: 8px;
   margin-bottom: 22px;
   border: 1px solid rgba(0, 247, 255, 0.13);
-  border-radius: 4px;
+  border-radius: 6px;
   background: #0d1428;
   padding: 8px;
 }
@@ -188,7 +244,7 @@
   justify-content: center;
   gap: 8px;
   border: 1px solid transparent;
-  border-radius: 4px;
+  border-radius: 6px;
   background: transparent;
   color: #dbe6fb;
   font-weight: 900;
@@ -219,7 +275,7 @@
   align-items: center;
   gap: 12px;
   border: 1px solid rgba(0, 247, 255, 0.22);
-  border-radius: 4px;
+  border-radius: 6px;
   background: rgba(7, 11, 29, 0.42);
   color: #00f7ff;
   padding: 0 14px;
@@ -232,6 +288,10 @@
   background: transparent;
   color: #ffffff;
   font: inherit;
+}
+
+.profile-input input::placeholder {
+  color: rgba(168, 182, 207, 0.72);
 }
 
 .profile-input input:focus {
@@ -279,7 +339,7 @@
   align-items: center;
   justify-content: center;
   border: 1px solid #00f7ff;
-  border-radius: 4px;
+  border-radius: 6px;
   background: #00f7ff;
   color: #020617;
   padding: 0 18px;

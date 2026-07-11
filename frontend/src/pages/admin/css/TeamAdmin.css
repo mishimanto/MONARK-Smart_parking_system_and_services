@@ -1,0 +1,64 @@
+.team-admin-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(330px, 440px);
+  gap: 22px;
+  align-items: start;
+}
+
+.team-admin-table {
+  min-width: 980px;
+}
+
+.team-founder-badge {
+  margin-top: 8px;
+}
+
+.team-social-icons {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #0891b2;
+  font-size: 19px;
+}
+
+.team-form-panel {
+  padding: 22px;
+}
+
+.team-form-page {
+  max-width: 980px;
+}
+
+.team-form-grid {
+  margin-top: 16px;
+}
+
+.team-image-card {
+  grid-template-columns: 112px minmax(0, 1fr);
+}
+
+.team-check-field {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  border: 1px solid rgba(8, 145, 178, 0.14);
+  border-radius: 4px;
+  background: #f8fbff;
+  padding: 0 12px;
+  color: #0f172a;
+  font-size: 13px;
+  font-weight: 850;
+}
+
+.team-check-field input {
+  width: 16px;
+  height: 16px;
+  accent-color: #00c7d7;
+}
+
+@media (max-width: 1180px) {
+  .team-admin-layout {
+    grid-template-columns: 1fr;
+  }
+}

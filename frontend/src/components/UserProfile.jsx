@@ -1,15 +1,17 @@
 import React, { useContext, useEffect, useState } from "react";
 import {
+  RiCameraLine,
   RiEyeLine,
   RiEyeOffLine,
   RiLockPasswordLine,
   RiMailLine,
   RiShieldCheckLine,
+  RiUploadCloud2Line,
   RiUser3Line,
   RiWallet3Line,
 } from "react-icons/ri";
 import { AuthContext } from "../contexts/AuthContext";
-import { changePassword, getProfile, updateProfile } from "../api/client";
+import { APP_BASE_URL, changePassword, getProfile, updateProfile, uploadProfileAvatar } from "../api/client";
 import "./css/UserProfile.css";
 
 const formatDate = (dateString) => {
@@ -21,10 +23,19 @@ const formatDate = (dateString) => {
 
 const formatMoney = (amount) => `BDT ${Number.parseFloat(amount || 0).toFixed(2)}`;
 
+const resolveAvatarUrl = (value) => {
+  if (!value) return "";
+  const avatar = String(value).trim();
+  if (!avatar) return "";
+  if (/^(https?:|data:)/i.test(avatar)) return avatar;
+  return `${APP_BASE_URL}/${avatar.replace(/^\/+/, "")}`;
+};
+
 export default function UserProfile() {
   const { setUser } = useContext(AuthContext);
   const [activeTab, setActiveTab] = useState("profile");
   const [loading, setLoading] = useState(false);
+  const [avatarUploading, setAvatarUploading] = useState(false);
   const [message, setMessage] = useState({ type: "", text: "" });
   const [profileData, setProfileData] = useState(null);
   const [validationErrors, setValidationErrors] = useState({});
@@ -64,6 +75,47 @@ export default function UserProfile() {
     setMessage({ type: "", text: "" });
   }, [activeTab]);
 
+  const syncUserState = (user) => {
+    setUser(user);
+    setProfileData(user);
+    const serializedUser = JSON.stringify(user);
+    if (localStorage.getItem("user")) {
+      localStorage.setItem("user", serializedUser);
+    }
+    if (sessionStorage.getItem("user")) {
+      sessionStorage.setItem("user", serializedUser);
+    }
+    if (!localStorage.getItem("user") && !sessionStorage.getItem("user")) {
+      localStorage.setItem("user", serializedUser);
+    }
+  };
+
+  const handleAvatarUpload = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setAvatarUploading(true);
+    setMessage({ type: "", text: "" });
+
+    try {
+      const response = await uploadProfileAvatar(file);
+      if (response.success) {
+        syncUserState(response.user);
+        setMessage({ type: "success", text: "Profile picture updated successfully." });
+      } else {
+        setMessage({ type: "error", text: response.message || "Failed to upload profile picture." });
+      }
+    } catch (error) {
+      setMessage({
+        type: "error",
+        text: error.response?.data?.message || "Failed to upload profile picture.",
+      });
+    } finally {
+      setAvatarUploading(false);
+      event.target.value = "";
+    }
+  };
+
   const handleProfileUpdate = async (event) => {
     event.preventDefault();
     setLoading(true);
@@ -74,9 +126,7 @@ export default function UserProfile() {
       const response = await updateProfile(profileForm);
       if (response.success) {
         setMessage({ type: "success", text: "Profile updated successfully." });
-        setUser(response.user);
-        setProfileData(response.user);
-        localStorage.setItem("user", JSON.stringify(response.user));
+        syncUserState(response.user);
       } else {
         setMessage({ type: "error", text: response.message || "Failed to update profile." });
       }
@@ -153,6 +203,7 @@ export default function UserProfile() {
   };
 
   const initials = profileData?.name ? profileData.name.charAt(0).toUpperCase() : "U";
+  const avatarUrl = resolveAvatarUrl(profileData?.avatar_url || profileData?.avatar);
 
   return (
     <main className="profile-page">
@@ -168,19 +219,31 @@ export default function UserProfile() {
         <section className="profile-layout">
           <aside className="profile-side">
             <div className="profile-side-card">
-              <div className="profile-avatar large">{initials}</div>
+              <div className="profile-avatar-wrap">
+                <div className="profile-avatar large">
+                  {avatarUrl ? <img src={avatarUrl} alt={profileData?.name || "User profile"} /> : initials}
+                </div>
+                <label className="profile-avatar-upload">
+                  <input type="file" accept="image/*" onChange={handleAvatarUpload} disabled={avatarUploading} />
+                  {avatarUploading ? <RiUploadCloud2Line /> : <RiCameraLine />}
+                  <span>{avatarUploading ? "Uploading..." : "Upload Photo"}</span>
+                </label>
+              </div>
               <h2>{profileData?.name || "User"}</h2>
-              <p>{profileData?.email || "Not available"}</p>
               <div className="profile-side-meta">
                 <div>
-                  <RiWallet3Line />
-                  <span>Wallet</span>
-                  <strong>{formatMoney(profileData?.wallet_balance)}</strong>
+                  <span className="profile-meta-icon"><RiWallet3Line /></span>
+                  <div>
+                    <span>Wallet</span>
+                    <strong>{formatMoney(profileData?.wallet_balance)}</strong>
+                  </div>
                 </div>
                 <div>
-                  <RiShieldCheckLine />
-                  <span>Member Since</span>
-                  <strong>{formatDate(profileData?.created_at)}</strong>
+                  <span className="profile-meta-icon"><RiShieldCheckLine /></span>
+                  <div>
+                    <span>Member Since</span>
+                    <strong>{formatDate(profileData?.created_at)}</strong>
+                  </div>
                 </div>
               </div>
             </div>
@@ -214,6 +277,7 @@ export default function UserProfile() {
                     <RiUser3Line />
                     <input
                       type="text"
+                      placeholder="Enter your full name"
                       value={profileForm.name}
                       onChange={(event) => setProfileForm({ ...profileForm, name: event.target.value })}
                       required
@@ -228,6 +292,7 @@ export default function UserProfile() {
                     <RiMailLine />
                     <input
                       type="email"
+                      placeholder="Enter your email address"
                       value={profileForm.email}
                       onChange={(event) => setProfileForm({ ...profileForm, email: event.target.value })}
                       required
@@ -253,6 +318,7 @@ export default function UserProfile() {
                       <RiLockPasswordLine />
                       <input
                         type={showPasswords[field.key] ? "text" : "password"}
+                        placeholder="Confirm your password"
                         value={passwordForm[field.key]}
                         onChange={(event) => handlePasswordInput(field.key, event.target.value)}
                         required

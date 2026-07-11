@@ -13,7 +13,7 @@ class PaymentMethod extends Model
      protected $table = 'payment_methods';
 
     protected $fillable = [
-        'name', 'type', 'account_number', 'is_active', 'credentials'
+        'name', 'type', 'account_number', 'icon', 'is_active', 'credentials'
     ];
 
     protected $casts = [

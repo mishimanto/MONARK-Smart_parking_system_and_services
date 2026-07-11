@@ -1,544 +1,669 @@
-import React, { useCallback, useState, useEffect } from "react";
-import axios from "axios";
-import Spinner from "../components/Spinner";
-import Swal from 'sweetalert2';
-import { API_BASE_URL } from "../api/client";
+import React, { useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import Swal from "sweetalert2";
+import {
+  RiArrowDownSLine,
+  RiArrowLeftSLine,
+  RiArrowRightSLine,
+  RiCameraLine,
+  RiCalendarCheckLine,
+  RiCheckboxCircleLine,
+  RiCloseLine,
+  RiDownload2Line,
+  RiEdit2Line,
+  RiLockPasswordLine,
+  RiLogoutBoxRLine,
+  RiMailLine,
+  RiRefreshLine,
+  RiSaveLine,
+  RiSearchLine,
+  RiShieldUserLine,
+  RiTimeLine,
+  RiUser3Line,
+} from "react-icons/ri";
+import { FiEdit, FiUser } from "react-icons/fi";
+import { HiWrenchScrewdriver } from "react-icons/hi2";
+import api, {
+  changePassword,
+  clearAuthData,
+  getProfile,
+  logoutUser,
+  updateProfile,
+  uploadProfileAvatar,
+} from "../api/client";
+import { AuthContext } from "../contexts/AuthContext";
+import { showErrorToast, showSuccessToast } from "../utils/toast";
+import "./css/MechanicDashboard.css";
 
-const MechanicDashboard = () => {
+const emptyPagination = {
+  current_page: 1,
+  last_page: 1,
+  total: 0,
+};
+
+const formatDate = (dateString) => {
+  if (!dateString) return "Not scheduled";
+  const date = new Date(dateString);
+  if (Number.isNaN(date.getTime())) return "Not scheduled";
+
+  return date.toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+};
+
+const formatPrice = (price) => `BDT ${Number.parseFloat(price || 0).toFixed(2)}`;
+const normalizeStatus = (status = "") => status.replaceAll("_", " ");
+
+export default function MechanicDashboard() {
+  const navigate = useNavigate();
+  const { user, setUser } = useContext(AuthContext);
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState({});
+  const [stats, setStats] = useState({
+    confirmed_orders: 0,
+    in_progress_orders: 0,
+    completed_today: 0,
+    total_assigned: 0,
+  });
   const [statusFilter, setStatusFilter] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [page, setPage] = useState(1);
+  const [pagination, setPagination] = useState(emptyPagination);
   const [loadingButtons, setLoadingButtons] = useState({});
+  const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
+  const [profileModal, setProfileModal] = useState("");
+  const [profileData, setProfileData] = useState(user || null);
+  const [profileForm, setProfileForm] = useState({ name: user?.name || "", email: user?.email || "" });
+  const [passwordForm, setPasswordForm] = useState({
+    current_password: "",
+    new_password: "",
+    new_password_confirmation: "",
+  });
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [avatarUploading, setAvatarUploading] = useState(false);
 
   const fetchOrders = useCallback(async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem("token");
-      
-      const params = new URLSearchParams({
-        ...(statusFilter && { status: statusFilter })
-      });
-
-      const response = await axios.get(
-        `${API_BASE_URL}/mechanic/orders?${params}`, 
-        {
-          headers: { 
-            Authorization: `Bearer ${token}`,
-            Accept: 'application/json'
-          }
-        }
-      );
-
-      if (response.data.success) {
-        setOrders(response.data.data.data || response.data.data);
-      }
-    } catch (error) {
-      console.error("Error:", error);
-      Swal.fire({
-        icon: 'error',
-        title: 'Failed to load orders',
-        text: 'Please try again later',
-        timer: 3000
-      });
-    } finally {
-      setLoading(false);
-    }
-  }, [statusFilter]);
-
-  const fetchStats = useCallback(async () => {
-    try {
-      const token = localStorage.getItem("token");
-      const response = await axios.get(`${API_BASE_URL}/mechanic/dashboard-stats`, {
-        headers: { 
-          Authorization: `Bearer ${token}`,
-          Accept: 'application/json'
-        }
+      const response = await api.get("/mechanic/orders", {
+        params: {
+          page,
+          per_page: 10,
+          ...(statusFilter ? { status: statusFilter } : {}),
+          ...(searchTerm.trim() ? { q: searchTerm.trim() } : {}),
+        },
       });
 
       if (response.data.success) {
-        setStats(response.data.data);
-      } else {
-        console.warn("Stats API returned success: false", response.data);
-        setStats({
-          confirmed_orders: orders.filter(o => o.status === 'confirmed').length,
-          in_progress_orders: orders.filter(o => o.status === 'in_progress').length,
-          completed_today: 0,
-          total_assigned: orders.length
+        const payload = response.data.data;
+        setOrders(payload?.data || payload || []);
+        setPagination({
+          current_page: payload?.current_page || 1,
+          last_page: payload?.last_page || 1,
+          total: payload?.total || 0,
         });
       }
     } catch (error) {
-      console.error("Error fetching stats:", error);
-      setStats({
-        confirmed_orders: orders.filter(o => o.status === 'confirmed').length,
-        in_progress_orders: orders.filter(o => o.status === 'in_progress').length,
-        completed_today: 0,
-        total_assigned: orders.length
-      });
+      console.error("Mechanic orders fetch error:", error);
+      showErrorToast("Failed to load orders", error.response?.data?.message || "Please try again later.");
+      setOrders([]);
+      setPagination(emptyPagination);
+    } finally {
+      setLoading(false);
     }
-  }, [orders]);
+  }, [page, searchTerm, statusFilter]);
+
+  const fetchStats = useCallback(async () => {
+    try {
+      const response = await api.get("/mechanic/dashboard-stats");
+      if (response.data.success) {
+        setStats(response.data.data);
+      }
+    } catch (error) {
+      console.error("Mechanic stats fetch error:", error);
+    }
+  }, []);
 
   useEffect(() => {
     fetchOrders();
+  }, [fetchOrders]);
+
+  useEffect(() => {
     fetchStats();
-  }, [fetchOrders, fetchStats]);
+  }, [fetchStats]);
+
+  const refreshProfile = useCallback(async () => {
+    try {
+      const response = await getProfile();
+      if (response.success) {
+        setProfileData(response.user);
+        setProfileForm({
+          name: response.user.name || "",
+          email: response.user.email || "",
+        });
+      }
+    } catch (error) {
+      console.error("Mechanic profile fetch error:", error);
+    }
+  }, []);
+
+  useEffect(() => {
+    refreshProfile();
+  }, [refreshProfile]);
+
+  const syncStoredUser = (nextUser) => {
+    setUser(nextUser);
+    setProfileData(nextUser);
+    setProfileForm({
+      name: nextUser.name || "",
+      email: nextUser.email || "",
+    });
+
+    const serialized = JSON.stringify(nextUser);
+    if (localStorage.getItem("user")) {
+      localStorage.setItem("user", serialized);
+    }
+    if (sessionStorage.getItem("user")) {
+      sessionStorage.setItem("user", serialized);
+    }
+  };
+
+  const handleRefresh = async () => {
+    await Promise.all([fetchOrders(), fetchStats()]);
+  };
 
   const startService = async (orderId) => {
     const result = await Swal.fire({
-      title: 'Start Service?',
-      text: 'Are you sure you want to start this service?',
-      icon: 'question',
+      title: "Start service?",
+      text: "This order will move to in progress.",
+      icon: "question",
       showCancelButton: true,
-      confirmButtonColor: '#3085d6',
-      cancelButtonColor: '#d33',
-      confirmButtonText: 'Yes, Start Service!',
-      cancelButtonText: 'Cancel'
+      confirmButtonColor: "#00b8c4",
+      cancelButtonColor: "#ef4444",
+      confirmButtonText: "Start Service",
     });
 
     if (!result.isConfirmed) return;
 
     try {
-      setLoadingButtons(prev => ({ ...prev, [orderId]: true }));
-      const token = localStorage.getItem("token");
-      const response = await axios.post(
-        `${API_BASE_URL}/mechanic/orders/${orderId}/start`,
-        {},
-        { 
-          headers: { 
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        }
-      );
+      setLoadingButtons((prev) => ({ ...prev, [orderId]: true }));
+      const response = await api.post(`/mechanic/orders/${orderId}/start`);
 
       if (response.data.success) {
-        await Swal.fire({
-          icon: 'success',
-          title: 'Service Started!',
-          text: 'Service has been started successfully',
-          timer: 2000,
-          showConfirmButton: false
-        });
-        fetchOrders();
-        fetchStats();
+        showSuccessToast("Service Started", "Assigned service has been started.");
+        await handleRefresh();
       }
-    } catch {
-      Swal.fire({
-        icon: 'error',
-        title: 'Failed to start service',
-        text: 'Please try again',
-        timer: 3000
-      });
+    } catch (error) {
+      showErrorToast("Failed to start service", error.response?.data?.message || "Please try again.");
     } finally {
-      setLoadingButtons(prev => ({ ...prev, [orderId]: false }));
+      setLoadingButtons((prev) => ({ ...prev, [orderId]: false }));
     }
   };
 
   const completeService = async (orderId) => {
     const result = await Swal.fire({
-      title: 'Complete Service?',
-      text: 'Are you sure you want to mark this service as completed?',
-      icon: 'question',
+      title: "Complete service?",
+      text: "Invoice will be generated after completion.",
+      icon: "question",
       showCancelButton: true,
-      confirmButtonColor: '#28a745',
-      cancelButtonColor: '#d33',
-      confirmButtonText: 'Yes, Complete Service!',
-      cancelButtonText: 'Cancel'
+      confirmButtonColor: "#00b8c4",
+      cancelButtonColor: "#ef4444",
+      confirmButtonText: "Complete Service",
     });
 
     if (!result.isConfirmed) return;
 
     try {
-      setLoadingButtons(prev => ({ ...prev, [orderId]: true }));
-      const token = localStorage.getItem("token");
-      
-      const response = await axios.post(
-        `${API_BASE_URL}/mechanic/orders/${orderId}/complete`,
-        {},
-        { 
-          headers: { 
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-          }
-        }
-      );
+      setLoadingButtons((prev) => ({ ...prev, [orderId]: true }));
+      const response = await api.post(`/mechanic/orders/${orderId}/complete`);
 
       if (response.data.success) {
-        await Swal.fire({
-          icon: 'success',
-          title: 'Service Completed!',
-          text: 'Service has been completed successfully',
-          timer: 2000,
-          showConfirmButton: false
-        });
-        fetchOrders();
-        fetchStats();
-      } else {
-        Swal.fire({
-          icon: 'error',
-          title: 'Failed to complete service',
-          text: response.data.message || 'Please try again',
-          timer: 3000
-        });
+        showSuccessToast("Service Completed", "Invoice has been generated successfully.");
+        await handleRefresh();
       }
     } catch (error) {
-      let errorMessage = 'Failed to complete service';
-      
-      if (error.response) {
-        errorMessage = error.response.data.message || `Server error: ${error.response.status}`;
-      } else if (error.request) {
-        errorMessage = 'Network error: Could not connect to server';
-      } else {
-        errorMessage = 'Error: ' + error.message;
-      }
-
-      Swal.fire({
-        icon: 'error',
-        title: 'Error',
-        text: errorMessage,
-        timer: 4000
-      });
+      showErrorToast("Failed to complete service", error.response?.data?.message || "Please try again.");
     } finally {
-      setLoadingButtons(prev => ({ ...prev, [orderId]: false }));
+      setLoadingButtons((prev) => ({ ...prev, [orderId]: false }));
     }
   };
 
-  // Slip download function
   const downloadSlip = async (order) => {
     try {
-      const token = localStorage.getItem("token");
-      console.log('Downloading slip for order:', order.id);
-      console.log('Slip number:', order.slip_number);
-
-      const response = await fetch(
-        `${API_BASE_URL}/admin/service-orders/${order.id}/download-slip`,
-        {
-          method: 'GET',
-          headers: { 
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
-
-      if (response.ok) {
-        const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.style.display = 'none';
-        a.href = url;
-        a.download = `booking-slip-${order.slip_number || order.id}.pdf`;
-        document.body.appendChild(a);
-        a.click();
-        window.URL.revokeObjectURL(url);
-        document.body.removeChild(a);
-        
-        await Swal.fire({
-          icon: 'success',
-          title: 'Slip Downloaded!',
-          text: 'Booking slip has been downloaded successfully',
-          timer: 2000,
-          showConfirmButton: false
-        });
-      } else {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Download failed');
-      }
-    } catch (error) {
-      console.error('Download slip error:', error);
-      Swal.fire({
-        icon: 'error',
-        title: 'Download Failed',
-        text: error.message || 'Failed to download slip',
-        timer: 3000
+      const response = await api.get(`/mechanic/orders/${order.id}/download-slip`, {
+        responseType: "blob",
       });
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", `booking-slip-${order.slip_number || order.id}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+
+      showSuccessToast("Slip Downloaded", "Booking slip has been downloaded.");
+    } catch (error) {
+      showErrorToast("Download Failed", error.response?.data?.message || "Failed to download slip.");
     }
   };
 
-  const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleString();
+  const statCards = useMemo(
+    () => [
+      {
+        label: "Ready for Service",
+        value: stats.confirmed_orders || 0,
+        icon: RiTimeLine,
+        tone: "cyan",
+      },
+      {
+        label: "In Progress",
+        value: stats.in_progress_orders || 0,
+        icon: HiWrenchScrewdriver,
+        tone: "amber",
+      },
+      {
+        label: "Completed Today",
+        value: stats.completed_today || 0,
+        icon: RiCheckboxCircleLine,
+        tone: "green",
+      },
+      {
+        label: "Total Assigned",
+        value: stats.total_assigned || 0,
+        icon: RiCalendarCheckLine,
+        tone: "blue",
+      },
+    ],
+    [stats]
+  );
+
+  const handleStatusChange = (event) => {
+    setStatusFilter(event.target.value);
+    setPage(1);
   };
 
-  const formatPrice = (price) => {
-    return `BDT ${parseFloat(price).toFixed(2)}`;
+  const handleSearchChange = (event) => {
+    setSearchTerm(event.target.value);
+    setPage(1);
   };
 
-  const getStatusBadge = (status) => {
-    const statusConfig = {
-      'confirmed': { class: 'bg-info text-white', label: 'Ready' },
-      'in_progress': { class: 'bg-warning text-dark', label: 'In Progress' }
-    };
-    
-    return statusConfig[status] || { class: 'bg-secondary', label: status };
+  const openProfileModal = (mode) => {
+    setProfileDropdownOpen(false);
+    setProfileModal(mode);
   };
 
-  if (loading) {
-    return <Spinner />;
-  }
+  const handleProfileSubmit = async (event) => {
+    event.preventDefault();
+    setProfileSaving(true);
+
+    try {
+      const response = await updateProfile(profileForm);
+      if (response.success) {
+        syncStoredUser(response.user);
+        showSuccessToast("Profile updated", "Your profile information has been updated.");
+        setProfileModal("");
+      }
+    } catch (error) {
+      showErrorToast("Update failed", error.response?.data?.message || "Please check your profile information.");
+    } finally {
+      setProfileSaving(false);
+    }
+  };
+
+  const handlePasswordSubmit = async (event) => {
+    event.preventDefault();
+
+    if (passwordForm.new_password !== passwordForm.new_password_confirmation) {
+      showErrorToast("Password mismatch", "New password and confirmation must match.");
+      return;
+    }
+
+    setProfileSaving(true);
+    try {
+      const response = await changePassword(passwordForm);
+      if (response.success) {
+        showSuccessToast("Password updated", "Your password has been changed successfully.");
+        setPasswordForm({
+          current_password: "",
+          new_password: "",
+          new_password_confirmation: "",
+        });
+        setProfileModal("");
+      }
+    } catch (error) {
+      showErrorToast("Password update failed", error.response?.data?.message || "Please try again.");
+    } finally {
+      setProfileSaving(false);
+    }
+  };
+
+  const handleAvatarUpload = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setAvatarUploading(true);
+    try {
+      const response = await uploadProfileAvatar(file);
+      if (response.success) {
+        syncStoredUser(response.user);
+        showSuccessToast("Photo updated", "Your profile picture has been updated.");
+      }
+    } catch (error) {
+      showErrorToast("Upload failed", error.response?.data?.message || "Please choose a valid image.");
+    } finally {
+      setAvatarUploading(false);
+      event.target.value = "";
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await logoutUser();
+    } catch (error) {
+      console.error("Mechanic logout error:", error);
+      clearAuthData();
+    } finally {
+      setUser(null);
+      navigate("/login", { replace: true });
+    }
+  };
+
+  const activeProfile = profileData || user || {};
+  const profileName = activeProfile.name || "Mechanic";
+  const profileEmail = activeProfile.email || "No email available";
+  const profileInitial = profileName.charAt(0).toUpperCase();
 
   return (
-    <div className="container-fluid">
-      {/* Header */}
-      <div className="row mb-4">
-        <div className="col-12">
-          <div className="d-flex justify-content-between align-items-center">
+    <main className="mechanic-page">
+      <div className="mechanic-shell">
+        <section className="mechanic-topbar">
+          <div>
+            <strong>Mechanic Panel</strong>
+          </div>
+          <div className="mechanic-profile-menu">
+            <button
+              type="button"
+              className="mechanic-profile-trigger"
+              onClick={() => setProfileDropdownOpen((prev) => !prev)}
+              aria-expanded={profileDropdownOpen}
+            >
+              <span className="mechanic-avatar">
+                {activeProfile.avatar_url ? <img src={activeProfile.avatar_url} alt={profileName} /> : profileInitial}
+              </span>
+              <span>
+                <strong>{profileName}</strong>
+              </span>
+              <RiArrowDownSLine />
+            </button>
+
+            {profileDropdownOpen && (
+              <div className="mechanic-profile-dropdown">                
+                <button type="button" onClick={() => openProfileModal("profile")}>
+                  <FiUser />
+                  Profile Info
+                </button>
+                <button type="button" onClick={() => openProfileModal("password")}>
+                  <RiLockPasswordLine />
+                  Change Password
+                </button>
+                <button type="button" className="is-danger" onClick={handleLogout}>
+                  <RiLogoutBoxRLine />
+                  Logout
+                </button>
+              </div>
+            )}
+          </div>
+        </section>
+
+        <section className="mechanic-hero">
+          <div className="mechanic-hero-copy">
             <div>
-              {/*<h1 className="h3 mb-0 text-gray-800">Mechanic Dashboard</h1>
-              <p className="text-muted">Manage your assigned car wash services</p>*/}
+              <span>Mechanic Workspace</span>
+              <h1>Assigned Service Orders</h1>
             </div>
-            <button className="btn btn-primary my-4" onClick={() => { fetchOrders(); fetchStats(); }}>
-              <i className="fas fa-sync-alt me-2"></i>Refresh
+            <button type="button" className="mechanic-hero-refresh" onClick={handleRefresh} disabled={loading}>
+              <RiRefreshLine className={loading ? "is-spinning" : ""} />
+              Refresh
             </button>
           </div>
-        </div>
-      </div>
+        </section>
 
-      {/* Mechanic Stats */}
-      <div className="row mb-4">
-        <div className="col-xl-3 col-md-6 mb-4">
-          <div className="card border-left-primary shadow h-100 py-2">
-            <div className="card-body">
-              <div className="row no-gutters align-items-center">
-                <div className="col mr-2">
-                  <div className="text-xs font-weight-bold text-primary text-uppercase mb-1">
-                    Ready for Service
-                  </div>
-                  <div className="h5 mb-0 font-weight-bold text-gray-800">
-                    {stats.confirmed_orders || 0}
-                  </div>
+        <section className="mechanic-stat-grid">
+          {statCards.map((item) => {
+            const Icon = item.icon;
+            return (
+              <article className={`mechanic-stat-card is-${item.tone}`} key={item.label}>
+                <div>
+                  <span>{item.label}</span>
+                  <strong>{item.value}</strong>
                 </div>
-                <div className="col-auto">
-                  <i className="fas fa-clock fa-2x text-gray-300"></i>
+                <div className="mechanic-stat-icon">
+                  <Icon />
                 </div>
-              </div>
-            </div>
+              </article>
+            );
+          })}
+        </section>
+
+        <section className="mechanic-toolbar">
+          <div className="mechanic-search">
+            <RiSearchLine />
+            <input
+              type="search"
+              value={searchTerm}
+              onChange={handleSearchChange}
+              placeholder="Search order, customer, or service"
+            />
           </div>
-        </div>
+          <select value={statusFilter} onChange={handleStatusChange}>
+            <option value="">All Assigned Orders</option>
+            <option value="confirmed">Ready for Service</option>
+            <option value="in_progress">In Progress</option>
+          </select>
+          <button type="button" className="mechanic-clear" onClick={() => { setStatusFilter(""); setSearchTerm(""); setPage(1); }}>
+            Clear
+          </button>
+        </section>
 
-        <div className="col-xl-3 col-md-6 mb-4">
-          <div className="card border-left-warning shadow h-100 py-2">
-            <div className="card-body">
-              <div className="row no-gutters align-items-center">
-                <div className="col mr-2">
-                  <div className="text-xs font-weight-bold text-warning text-uppercase mb-1">
-                    In Progress
-                  </div>
-                  <div className="h5 mb-0 font-weight-bold text-gray-800">
-                    {stats.in_progress_orders || 0}
-                  </div>
-                </div>
-                <div className="col-auto">
-                  <i className="fas fa-spinner fa-2x text-gray-300"></i>
-                </div>
-              </div>
+        <section className="mechanic-orders-panel">
+          <div className="mechanic-panel-head">
+            <div>
+              <h2>Assigned services</h2>
             </div>
+            <small>{pagination.total || orders.length} assigned</small>
           </div>
-        </div>
 
-        <div className="col-xl-3 col-md-6 mb-4">
-          <div className="card border-left-success shadow h-100 py-2">
-            <div className="card-body">
-              <div className="row no-gutters align-items-center">
-                <div className="col mr-2">
-                  <div className="text-xs font-weight-bold text-success text-uppercase mb-1">
-                    Completed Today
-                  </div>
-                  <div className="h5 mb-0 font-weight-bold text-gray-800">
-                    {stats.completed_today || 0}
-                  </div>
-                </div>
-                <div className="col-auto">
-                  <i className="fas fa-check-circle fa-2x text-gray-300"></i>
-                </div>
+          {loading ? (
+            <div className="mechanic-state">Loading assigned orders...</div>
+          ) : orders.length > 0 ? (
+            <>
+              <div className="mechanic-order-list">
+                {orders.map((order) => {
+                  const isLoading = loadingButtons[order.id];
+                  const isReady = order.status === "confirmed";
+                  const isInProgress = order.status === "in_progress";
+
+                  return (
+                    <article className="mechanic-order-card" key={order.id}>
+                      <div className="mechanic-order-id">
+                        <span>Order</span>
+                        <strong>#{order.id}</strong>
+                      </div>
+
+                      <div className="mechanic-order-main">
+                        <div className="mechanic-user-icon">
+                          <RiUser3Line />
+                        </div>
+                        <div>
+                          <h3>{order.user?.name || "Customer"}</h3>
+                          <p>{order.user?.email || "No email available"}</p>
+                        </div>
+                      </div>
+
+                      <div className="mechanic-service-info">
+                        <span>Service</span>
+                        <strong>{order.service?.name || "Car Service"}</strong>
+                        <p>{order.service?.duration || "Flexible"} • {formatPrice(order.service?.price)}</p>
+                      </div>
+
+                      <div className="mechanic-date-box">
+                        <span>Booking Time</span>
+                        <strong>{formatDate(order.booking_time)}</strong>
+                      </div>
+
+                      <div className="mechanic-status-box">
+                        <span className={`mechanic-status is-${order.status}`}>{normalizeStatus(order.status)}</span>
+                        {order.slip_number ? (
+                          <button type="button" onClick={() => downloadSlip(order)}>
+                            <RiDownload2Line />
+                            Slip
+                          </button>
+                        ) : (
+                          <small>No slip yet</small>
+                        )}
+                      </div>
+
+                      <div className="mechanic-actions">
+                        {isReady && (
+                          <button type="button" className="is-start" onClick={() => startService(order.id)} disabled={isLoading}>
+                            <HiWrenchScrewdriver />
+                            {isLoading ? "Starting..." : "Start"}
+                          </button>
+                        )}
+                        {isInProgress && (
+                          <button type="button" className="is-complete" onClick={() => completeService(order.id)} disabled={isLoading}>
+                            <RiCheckboxCircleLine />
+                            {isLoading ? "Completing..." : "Complete"}
+                          </button>
+                        )}
+                      </div>
+                    </article>
+                  );
+                })}
               </div>
-            </div>
-          </div>
-        </div>
 
-        <div className="col-xl-3 col-md-6 mb-4">
-          <div className="card border-left-info shadow h-100 py-2">
-            <div className="card-body">
-              <div className="row no-gutters align-items-center">
-                <div className="col mr-2">
-                  <div className="text-xs font-weight-bold text-info text-uppercase mb-1">
-                    Total Assigned
-                  </div>
-                  <div className="h5 mb-0 font-weight-bold text-gray-800">
-                    {stats.total_assigned || 0}
-                  </div>
-                </div>
-                <div className="col-auto">
-                  <i className="fas fa-clipboard-list fa-2x text-gray-300"></i>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Filter */}
-      <div className="row mb-4">
-        <div className="col-12">
-          <div className="card shadow">
-            <div className="card-body">
-              <div className="row">
-                <div className="col-md-6">
-                  <select
-                    className="form-select"
-                    value={statusFilter}
-                    onChange={(e) => setStatusFilter(e.target.value)}
-                  >
-                    <option value="">All Assigned Orders</option>
-                    <option value="confirmed">Ready for Service</option>
-                    <option value="in_progress">In Progress</option>
-                  </select>
-                </div>
-                <div className="col-md-6">
-                  <button
-                    className="btn btn-outline-secondary w-100"
-                    onClick={() => setStatusFilter("")}
-                  >
-                    Clear Filter
+              {pagination.last_page > 1 && (
+                <div className="mechanic-pagination">
+                  <button type="button" disabled={page <= 1} onClick={() => setPage((prev) => Math.max(1, prev - 1))}>
+                    <RiArrowLeftSLine />
+                    Previous
+                  </button>
+                  <span>{pagination.current_page} / {pagination.last_page}</span>
+                  <button type="button" disabled={page >= pagination.last_page} onClick={() => setPage((prev) => Math.min(pagination.last_page, prev + 1))}>
+                    Next
+                    <RiArrowRightSLine />
                   </button>
                 </div>
-              </div>
+              )}
+            </>
+          ) : (
+            <div className="mechanic-empty">
+              <HiWrenchScrewdriver />
+              <h3>No assigned orders found</h3>
             </div>
-          </div>
-        </div>
+          )}
+        </section>
       </div>
 
-      {/* Orders Table */}
-      <div className="row">
-        <div className="col-12">
-          <div className="card shadow">
-            <div className="card-body">
-              <div className="table-responsive">
-                <table className="table table-bordered table-hover">
-                  <thead className="table-dark">
-                    <tr>
-                      <th className="text-center">Order ID</th>
-                      <th className="text-center">Customer</th>
-                      <th className="text-center">Service</th>
-                      <th className="text-center">Booking Time</th>
-                      <th className="text-center">Slip</th>
-                      <th className="text-center">Status</th>
-                      <th className="text-center">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {orders.length > 0 ? (
-                      orders.map((order) => {
-                        const statusConfig = getStatusBadge(order.status);
-                        const isLoading = loadingButtons[order.id];
-                        
-                        return (
-                          <tr key={order.id}>
-                            <td>
-                              <strong>#{order.id}</strong>
-                              {order.notes && (
-                                <>
-                                  <br />
-                                  <small className="text-muted">
-                                    📝 {order.notes}
-                                  </small>
-                                </>
-                              )}
-                            </td>
-                            <td>
-                              <strong>{order.user?.name}</strong>
-                              <br />
-                              <small>{order.user?.email}</small>
-                            </td>
-                            <td>
-                              <strong>{order.service?.name}</strong>
-                              <br />
-                              <small>{order.service?.description}</small>
-                              <br />
-                              <small className="text-info">{order.service?.duration}</small>
-                              <br />
-                              <strong className="text-success">{formatPrice(order.service?.price)}</strong>
-                            </td>
-                            <td>{formatDate(order.booking_time)}</td>
-                            <td className="text-center">
-                              {order.slip_number ? (
-                                <div className="d-flex flex-column align-items-center">
-                                  <strong 
-                                    className="text-primary cursor-pointer text-decoration-underline"
-                                    onClick={() => downloadSlip(order)}
-                                    style={{ cursor: 'pointer' }}
-                                    title="Click to download slip"
-                                  >
-                                    {order.slip_number}
-                                  </strong>
-                                  {/*<small className="text-muted mt-1">Click to download</small>*/}
-                                </div>
-                              ) : (
-                                <span className="text-muted">Not generated</span>
-                              )}
-                            </td>
-                            <td className="text-center">
-                              <span className={`badge p-2 ${statusConfig.class}`}>
-                                {statusConfig.label}
-                              </span>
-                            </td>
-                            <td>
-                              {order.status === 'confirmed' && (
-                                <button
-                                  className="btn btn-success btn-sm w-100 mb-2"
-                                  onClick={() => startService(order.id)}
-                                  disabled={isLoading}
-                                >
-                                  {isLoading ? (
-                                    <>
-                                      <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                                      Starting...
-                                    </>
-                                  ) : (
-                                    'Start Service'
-                                  )}
-                                </button>
-                              )}
-                              
-                              {order.status === 'in_progress' && (
-                                <button
-                                  className="btn btn-primary btn-sm w-100"
-                                  onClick={() => completeService(order.id)}
-                                  disabled={isLoading}
-                                >
-                                  {isLoading ? (
-                                    <>
-                                      <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                                      Completing...
-                                    </>
-                                  ) : (
-                                    'Complete Service'
-                                  )}
-                                </button>
-                              )}
-                            </td>
-                          </tr>
-                        );
-                      })
-                    ) : (
-                      <tr>
-                        <td colSpan="7" className="text-center py-4">
-                          <div className="text-muted">
-                            <i className="fas fa-tools fa-3x mb-3"></i>
-                            <p>No assigned orders found</p>
-                            <p className="small">Orders will appear here after admin confirmation</p>
-                          </div>
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
+      {profileModal && (
+        <div className="mechanic-modal" role="dialog" aria-modal="true">
+          <div className="mechanic-modal-card">
+            <div className="mechanic-modal-head">
+              <div>
+                <h2>{profileModal === "profile" ? "Profile Information" : "Change Password"}</h2>
               </div>
+              <button type="button" onClick={() => setProfileModal("")}>
+                <RiCloseLine />
+              </button>
             </div>
+
+            {profileModal === "profile" ? (
+              <form className="mechanic-profile-form" onSubmit={handleProfileSubmit}>
+                <div className="mechanic-profile-photo">
+                  <span className="mechanic-avatar xlarge">
+                    {activeProfile.avatar_url ? <img src={activeProfile.avatar_url} alt={profileName} /> : profileInitial}
+                  </span>
+                  <label>
+                    {avatarUploading ? "Uploading..." : "Upload Photo"}
+                    <input type="file" accept="image/*" onChange={handleAvatarUpload} disabled={avatarUploading} />
+                  </label>
+                </div>
+
+                <label>
+                  <span><RiUser3Line /> Name</span>
+                  <input
+                    type="text"
+                    value={profileForm.name}
+                    onChange={(event) => setProfileForm((prev) => ({ ...prev, name: event.target.value }))}
+                    placeholder="Your name"
+                    required
+                  />
+                </label>
+                <label>
+                  <span><RiMailLine /> Email</span>
+                  <input
+                    type="email"
+                    value={profileForm.email}
+                    onChange={(event) => setProfileForm((prev) => ({ ...prev, email: event.target.value }))}
+                    placeholder="Your email"
+                    required
+                  />
+                </label>
+                <label>
+                  <span><RiShieldUserLine /> Role</span>
+                  <input type="text" value={activeProfile.role || "mechanic"} disabled />
+                </label>
+                <button type="submit" disabled={profileSaving}>
+                  <RiSaveLine />
+                  {profileSaving ? "Saving..." : "Save Changes"}
+                </button>
+              </form>
+            ) : (
+              <form className="mechanic-profile-form" onSubmit={handlePasswordSubmit}>
+                <label>
+                  <span>Current Password</span>
+                  <input
+                    type="password"
+                    value={passwordForm.current_password}
+                    onChange={(event) => setPasswordForm((prev) => ({ ...prev, current_password: event.target.value }))}
+                    placeholder="Current password"
+                    required
+                  />
+                </label>
+                <label>
+                  <span>New Password</span>
+                  <input
+                    type="password"
+                    value={passwordForm.new_password}
+                    onChange={(event) => setPasswordForm((prev) => ({ ...prev, new_password: event.target.value }))}
+                    placeholder="New password"
+                    required
+                  />
+                </label>
+                <label>
+                  <span>Confirm Password</span>
+                  <input
+                    type="password"
+                    value={passwordForm.new_password_confirmation}
+                    onChange={(event) => setPasswordForm((prev) => ({ ...prev, new_password_confirmation: event.target.value }))}
+                    placeholder="Confirm new password"
+                    required
+                  />
+                </label>
+                <button type="submit" disabled={profileSaving}>
+                  <RiLockPasswordLine />
+                  {profileSaving ? "Updating..." : "Update Password"}
+                </button>
+              </form>
+            )}
           </div>
         </div>
-      </div>
-    </div>
+      )}
+    </main>
   );
-};
-
-export default MechanicDashboard;
+}

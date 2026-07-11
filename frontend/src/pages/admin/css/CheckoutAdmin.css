@@ -1,0 +1,122 @@
+.checkout-admin-page {
+  display: grid;
+  gap: 24px;
+}
+
+.checkout-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.checkout-table {
+  min-width: 1160px;
+}
+
+.checkout-info-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.checkout-info-grid article {
+  display: grid;
+  gap: 10px;
+  border: 1px solid rgba(8, 145, 178, 0.12);
+  border-radius: 4px;
+  background: #ffffff;
+  box-shadow: 0 18px 46px rgba(15, 23, 42, 0.08);
+  padding: 18px;
+}
+
+.checkout-info-grid strong {
+  color: #0f172a;
+  font-size: 22px;
+  font-weight: 950;
+}
+
+.checkout-info-grid p {
+  margin: 0;
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.checkout-time-stack,
+.checkout-charge-stack {
+  display: grid;
+  gap: 7px;
+  min-width: 190px;
+}
+
+.checkout-time-stack span,
+.checkout-charge-stack span,
+.checkout-charge-stack em {
+  color: #64748b;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 750;
+}
+
+.checkout-time-stack strong {
+  color: #0f172a;
+  font-weight: 950;
+}
+
+.checkout-extra-time,
+.checkout-charge-stack span {
+  color: #b45309 !important;
+  font-weight: 900 !important;
+}
+
+.checkout-charge-stack strong {
+  color: #047857;
+  font-weight: 950;
+}
+
+.checkout-charge-stack em {
+  color: #0891b2;
+  font-weight: 950;
+}
+
+.checkout-actions-col {
+  text-align: center;
+}
+
+.checkout-row-actions {
+  justify-content: center;
+}
+
+.checkout-row-actions .pa-mini-btn {
+  min-width: 92px;
+}
+
+.checkout-action-note {
+  display: block;
+  margin-top: 8px;
+  font-size: 11px;
+  font-weight: 900;
+  text-align: center;
+}
+
+.checkout-action-note.is-warning {
+  color: #b45309;
+}
+
+.checkout-action-note.is-success {
+  color: #047857;
+}
+
+@media (max-width: 1100px) {
+  .checkout-stat-grid,
+  .checkout-info-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 680px) {
+  .checkout-stat-grid,
+  .checkout-info-grid {
+    grid-template-columns: 1fr;
+  }
+}
