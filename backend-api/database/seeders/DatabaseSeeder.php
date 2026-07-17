@@ -26,9 +26,10 @@ class DatabaseSeeder extends Seeder
         // ]);
 
         $this->call([
-        AboutPageSeeder::class,
-        ContactPageSeeder::class,
-    ]);
+            AdminSeeder::class,
+            AboutPageSeeder::class,
+            ContactPageSeeder::class,
+        ]);
 
         Contact::updateOrCreate(
             ['email' => 'support@monark.test'],
